@@ -1,0 +1,31 @@
+schema_version = "1.0.0"
+
+id = "quadforge"
+version = "0.10.31"
+name = "QuadForge Vivaldi"
+tagline = "Fast quad and triangle remesher with its own engine"
+maintainer = "Gregorio Carreño <gregcarr3dwork@gmail.com>"
+type = "add-on"
+
+tags = ["Mesh"]
+
+blender_version_min = "4.2.0"
+
+# Operating systems this package contains an engine for (tools/package.py writes the right list per zip).
+platforms = ["windows-x64", "linux-x64", "macos-arm64", "macos-x64"]
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+copyright = [
+  "2026 Gregorio Carreño",
+]
+
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "/*.zip",
+  "/tests/",
+  "/docs/",
+]
