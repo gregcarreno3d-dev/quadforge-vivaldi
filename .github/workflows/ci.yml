@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - name: Install tools
-        run: python -m pip install ziglang numpy
+        run: python -m pip install ziglang numpy scikit-image
       - name: Build the engine natively
         run: python tools/build.py ${{ matrix.name }}
       - name: Engine hard cases (25 models)
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
       - name: Install
-        run: python -m pip install ziglang numpy bpy
+        run: python -m pip install ziglang numpy scikit-image bpy
       - name: Build Linux engine
         run: |
           python tools/build.py linux
