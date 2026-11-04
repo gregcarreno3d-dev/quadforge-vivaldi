@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    name: Engine ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux,       os: ubuntu-latest,  exe: forge }
+          - { name: windows,     os: windows-latest, exe: forge.exe }
+          - { name: macos-arm64, os: macos-14,       exe: forge }
+          - { name: macos-x64,   os: macos-15-intel,      exe: forge }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Install tools
+        run: python -m pip install ziglang numpy
+      - name: Build the engine natively
+        run: python tools/build.py ${{ matrix.name }}
+      - name: Engine hard cases (25 models)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t08_hard_cases.py
+      - name: Engine robustness (quick)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t07_robustness.py --quick
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.name }}
+          path: engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+
+  addon:
+    name: Add-on tests in Blender (bpy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - name: Install
+        run: python -m pip install ziglang numpy bpy
+      - name: Build Linux engine
+        run: |
+          python tools/build.py linux
+          mkdir -p quadforge/bin/linux
+          cp engine/bin/linux/forge quadforge/bin/linux/forge
+      - name: Add-on tests
+        run: |
+          python quadforge/tests/blender_forge_test.py
+          python quadforge/tests/blender_integration_test.py
+          python quadforge/tests/blender_matrix_test.py
