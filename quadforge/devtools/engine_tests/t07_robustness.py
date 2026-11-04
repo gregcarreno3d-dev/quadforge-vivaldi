@@ -199,11 +199,14 @@ def judge(res, info, faces, input_open=False):
         bad.append("topology " + json.dumps({k: v for k, v in chk.items() if v and k not in ("euler", "unused_vertices")}))
     if qfrac < 0.98:
         bad.append(f"quads {qfrac:.1%}")
-    if err > 0.10:
+    if err > COUNT_TOLERANCE:      # same 15 % the add-on warns about (TARGET_MISS_WARNING_FRACTION); the engine itself aims at 4-6 %
         bad.append(f"count off {err:.0%}")
     if st.get("method") != "extract":
         bad.append("fallback: " + str(st.get("fallback")))
     return not bad, "; ".join(bad), q
+
+
+COUNT_TOLERANCE = 0.15
 
 
 def main():

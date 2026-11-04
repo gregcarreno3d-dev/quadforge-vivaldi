@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use QuadForge or the FORGE engine, please cite it as below."
+title: "QuadForge Vivaldi: a Blender add-on with the FORGE quad remeshing engine"
+type: software
+authors:
+  - alias: "GregCarreno3D"
+    email: "gregcarr3dwork@gmail.com"
+repository-code: "https://github.com/gregcarreno3d-dev/quadforge-vivaldi"
+url: "https://github.com/gregcarreno3d-dev/quadforge-vivaldi"
+abstract: >-
+  QuadForge is a Blender add-on for quad and triangle remeshing. Its engine, FORGE, is a dependency-free C++17
+  program that computes a smooth four-direction cross field, a seamless integer-grid parametrization and a quad
+  extraction, with exact symmetry, hard-edge preservation, zones and density control. See docs/TECHNICAL_REPORT.md.
+keywords:
+  - remeshing
+  - quad meshing
+  - retopology
+  - cross field
+  - integer-grid map
+  - Blender
+license: GPL-3.0-or-later
+version: "0.10.31"
+date-released: "2026-11-04"

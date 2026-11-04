@@ -88,5 +88,14 @@ Open borders: the engine closes every border loop with a cap, treats the loop as
 - Symmetry with FORGE quads on closed models: the whole model is remeshed with the planes as guide lines, then cut and mirrored (0.10.13; ant: poles 570 → 324, no open seam edges). The other cases still cut first.
 - With symmetry the result is mirrored: if the model is not symmetric the shape changes (a warning is shown).
 
+## Known issues
+- **Intermittent seam gap with symmetry.** Once, on GitHub's continuous-integration runner, the matrix scenario "block-holes,
+  symmetry X + hard edges" ended with 3 open edges on the centre seam (the add-on warned about it). It could not be
+  reproduced in about 100 local runs of that scenario (different thread counts, coordinate jitter, 24 repeated runs of that scenario),
+  so the cause is most likely a platform-dependent numeric difference. Small gaps (one or two dropped quads at the
+  seam) are repaired by the add-on; a gap of 14 or more edges is not (it needs a hole larger than the 12-side fill limit).
+  The matrix test therefore reports but does not block the build. If you see "The centre seam has N open edges",
+  try a slightly different target count or a larger Weld Distance, and please open an issue with the model.
+
 ## Suggested roadmap
 0.5.x: fixes after the author's tests. 0.6: lattice extraction. 0.7: integer-grid parametrization. 0.8: alignment to hard edges. Next: borders, a faster solver, thin-part handling. Then the Rust port (parallel version) and publishing.

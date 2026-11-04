@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" role="img" aria-labelledby="t d">
+  <title id="t">FORGE pipeline</title>
+  <desc id="d">Blender preparation, then the FORGE engine stages from repair to quad extraction with a pairing fallback, then Blender finishing.</desc>
+  <style>
+    .bg{fill:#ffffff}
+    .box{fill:#f4f6fb;stroke:#4a5a8a;stroke-width:1.5;rx:8}
+    .py{fill:#eaf3ea;stroke:#3f7d46}
+    .cpp{fill:#eef1fa;stroke:#4a5a8a}
+    .fb{fill:#fdf1e3;stroke:#b36a1c}
+    .band{fill:none;stroke:#9aa3b8;stroke-dasharray:6 5;stroke-width:1.2}
+    text{font-family:Helvetica,Arial,sans-serif;fill:#1d2433}
+    .h{font-size:15px;font-weight:700}
+    .s{font-size:12px;fill:#44506b}
+    .lab{font-size:12px;font-weight:700;fill:#44506b}
+    .arr{stroke:#4a5a8a;stroke-width:1.6;fill:none;marker-end:url(#a)}
+    .arf{stroke:#b36a1c;stroke-width:1.6;fill:none;stroke-dasharray:5 4;marker-end:url(#b)}
+    @media (prefers-color-scheme: dark){
+      .bg{fill:#0f1420}.box{fill:#1a2133;stroke:#8a9ad0}.py{fill:#16281a;stroke:#6fbf78}.cpp{fill:#1a2133;stroke:#8a9ad0}.fb{fill:#2c2112;stroke:#e0983f}
+      text{fill:#e6eaf5}.s,.lab{fill:#aab4cf}.band{stroke:#6b7590}.arr{stroke:#8a9ad0}.arf{stroke:#e0983f}
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4a5a8a"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#b36a1c"/></marker>
+  </defs>
+  <rect class="bg" width="960" height="640"/>
+
+  <text class="lab" x="30" y="28">A  BLENDER (Python)  preparation</text>
+  <rect class="band" x="20" y="36" width="920" height="92" rx="10"/>
+  <rect class="box py" x="34" y="50" width="160" height="64"/><text class="h" x="46" y="74">Read + zones</text><text class="s" x="46" y="92">modifiers applied,</text><text class="s" x="46" y="106">materials / sets / groups</text>
+  <rect class="box py" x="210" y="50" width="160" height="64"/><text class="h" x="222" y="74">Hard edges</text><text class="s" x="222" y="92">angle + chain filter,</text><text class="s" x="222" y="106">seams, zone borders</text>
+  <rect class="box py" x="386" y="50" width="160" height="64"/><text class="h" x="398" y="74">Symmetry plan</text><text class="s" x="398" y="92">plane = guide line,</text><text class="s" x="398" y="106">cut after remesh</text>
+  <rect class="box py" x="562" y="50" width="160" height="64"/><text class="h" x="574" y="74">Density + guides</text><text class="s" x="574" y="92">vertex group, flow</text><text class="s" x="574" y="106">guide edges</text>
+  <rect class="box py" x="738" y="50" width="188" height="64"/><text class="h" x="750" y="74">Write .fmesh</text><text class="s" x="750" y="92">start the engine as a</text><text class="s" x="750" y="106">separate process</text>
+  <path class="arr" d="M194 82H208"/><path class="arr" d="M370 82H384"/><path class="arr" d="M546 82H560"/><path class="arr" d="M722 82H736"/>
+
+  <path class="arr" d="M832 114V150"/>
+
+  <text class="lab" x="30" y="166">B  FORGE ENGINE (C++, separate process)</text>
+  <rect class="band" x="20" y="174" width="920" height="318" rx="10"/>
+  <rect class="box cpp" x="34" y="190" width="200" height="64"/><text class="h" x="46" y="214">1  Repair</text><text class="s" x="46" y="232">manifold triangles,</text><text class="s" x="46" y="246">cap open borders</text>
+  <rect class="box cpp" x="254" y="190" width="200" height="64"/><text class="h" x="266" y="214">2  Size field</text><text class="s" x="266" y="232">thickness, curvature,</text><text class="s" x="266" y="246">graded multiplier</text>
+  <rect class="box cpp" x="474" y="190" width="200" height="64"/><text class="h" x="486" y="214">3  Isotropic remesh</text><text class="s" x="486" y="232">~6 triangles per cell,</text><text class="s" x="486" y="246">projected on the source</text>
+  <rect class="box cpp" x="694" y="190" width="232" height="64"/><text class="h" x="706" y="214">4  Cross field</text><text class="s" x="706" y="232">z = exp(4i·theta), smoothest</text><text class="s" x="706" y="246">field, creases, guides</text>
+  <path class="arr" d="M234 222H252"/><path class="arr" d="M454 222H472"/><path class="arr" d="M674 222H692"/>
+
+  <path class="arr" d="M810 254V282H134V300"/>
+
+  <rect class="box cpp" x="34" y="300" width="270" height="86"/><text class="h" x="46" y="324">5  Integer-grid parametrization</text><text class="s" x="46" y="344">matching, singularities, cut graph,</text><text class="s" x="46" y="358">least squares, gradual integer rounding,</text><text class="s" x="46" y="372">junction repair (multi-core CG)</text>
+  <rect class="box cpp" x="324" y="300" width="270" height="86"/><text class="h" x="336" y="324">6  Quad extraction</text><text class="s" x="336" y="344">snap vertices to lattice nodes, merge</text><text class="s" x="336" y="358">cells, trace faces, fill holes,</text><text class="s" x="336" y="372">virtual subdivision of stretched tris</text>
+  <rect class="box cpp" x="614" y="300" width="312" height="86"/><text class="h" x="626" y="324">7  Refine</text><text class="s" x="626" y="344">split 1 to 4, relax + reproject, snap to</text><text class="s" x="626" y="358">marked edges, merge dead ends,</text><text class="s" x="626" y="372">raise worst scaled Jacobian</text>
+  <path class="arr" d="M304 343H322"/><path class="arr" d="M594 343H612"/>
+
+  <rect class="box fb" x="34" y="412" width="560" height="64"/><text class="h" x="46" y="436">Fallback: triangle pairing</text><text class="s" x="46" y="454">used when the grid fails, has open edges, a size gradient it cannot follow, or the time limit hits</text><text class="s" x="46" y="468">greedy + augmenting paths, valence-aware annealing, subdivision, relaxation</text>
+  <path class="arf" d="M459 386V410"/>
+  <text class="s" x="470" y="402">failure</text>
+  <rect class="box cpp" x="614" y="412" width="312" height="64"/><text class="h" x="626" y="436">Count control</text><text class="s" x="626" y="454">up to 3 passes on the lattice spacing,</text><text class="s" x="626" y="468">within 4 % (6 % above 30K quads)</text>
+  <path class="arr" d="M770 386V410"/>
+
+  <path class="arr" d="M770 476V520H832V534"/>
+  <text class="lab" x="30" y="530">C  BLENDER (Python)  finishing</text>
+  <rect class="band" x="20" y="538" width="920" height="92" rx="10"/>
+  <rect class="box py" x="34" y="552" width="200" height="64"/><text class="h" x="46" y="576">Sliver cleanup</text><text class="s" x="46" y="594">collapse tiny edges,</text><text class="s" x="46" y="608">retarget if faces vanish</text>
+  <rect class="box py" x="254" y="552" width="200" height="64"/><text class="h" x="266" y="576">Cut + mirror + weld</text><text class="s" x="266" y="594">exact symmetry,</text><text class="s" x="266" y="608">no open seam</text>
+  <rect class="box py" x="474" y="552" width="200" height="64"/><text class="h" x="486" y="576">Transfer data</text><text class="s" x="486" y="594">UV maps, Face Sets,</text><text class="s" x="486" y="608">mask, materials</text>
+  <rect class="box py" x="694" y="552" width="232" height="64"/><text class="h" x="706" y="576">Result object(s)</text><text class="s" x="706" y="594">one per requested level,</text><text class="s" x="706" y="608">original untouched</text>
+  <path class="arr" d="M234 584H252"/><path class="arr" d="M454 584H472"/><path class="arr" d="M674 584H692"/>
+</svg>
