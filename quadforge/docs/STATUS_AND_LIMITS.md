@@ -1,4 +1,4 @@
-# Status and limits — QuadForge Vivaldi 0.10.31
+# Status and limits — QuadForge Vivaldi 0.11.0
 
 ## Tested
 - FORGE engine (Linux): sphere, torus, box with 12 exact hard edges, hemisphere with border, cylinder, density (length ratio 2.99 vs 3 requested), meshes with defects, 120 random cases with no failures, 1.3 M tris → 40 K in ~7 s (peak ~390 MB).
@@ -84,7 +84,9 @@ Open borders: the engine closes every border loop with a cap, treats the loop as
 - **Finger tips, 120 000+ quads (improved in 0.10.13)**: where the parametrization stretches the grid (3–5× at thin tips) the isotropic mesh had fewer vertices than lattice points, so some cells were lost and filled with irregular patches. 0.10.13 subdivides stretched triangles virtually before extracting cells (hand at 118K: poles 280 → ~60, holes 13 → 5). A few holes can remain in the thinnest tips; they are filled and the result stays valid. Debug switch: `FORGE_NOSUBDIV=1`.
 - Large counts take tens of seconds (a plain conjugate-gradient solver); QuadriFlow is slower still.
 - QuadriFlow route cannot be cancelled (Blender's operator is blocking); FORGE can (Esc).
-- No guide curves and no directly painted density (vertex group only).
+- No guide curves and no directly painted density (vertex group only). Detail by Zone gives about 1.7 times more faces for a factor of 2, not 4: the engine changes density gradually to keep clean quads.
+- Subdivision Match is made for smooth shapes: near sharp creases points can move up to a third of an edge; triangles and n-gons are skipped.
+- Flow guides on closed loops (around an eye) raise the share of quad rows that follow the loop only modestly on a synthetic head (62–70 %); real heads are still needed to tune this.
 - Robustness suite (`t07_robustness.py`): 114/115 cases pass (0.10.31). Known miss: very small targets on hard-surface parts with many small features (a gear asked for 600 faces gives 372).
 - Symmetry with FORGE quads on closed models: the whole model is remeshed with the planes as guide lines, then cut and mirrored (0.10.13; ant: poles 570 → 324, no open seam edges). The other cases still cut first.
 - With symmetry the result is mirrored: if the model is not symmetric the shape changes (a warning is shown).

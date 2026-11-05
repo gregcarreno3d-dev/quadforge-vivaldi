@@ -33,6 +33,7 @@ Stability rules:
 from __future__ import annotations
 
 import dataclasses
+import math
 import os
 import time
 from dataclasses import dataclass, field
@@ -48,6 +49,7 @@ from . import features
 from . import geometry as geo
 from . import mesh_io as mio
 from . import profiling
+from . import subdfit
 from . import uvtransfer
 from . import zonedata
 from . import symmetry as sym
@@ -88,6 +90,8 @@ class RemeshSettings:
     output: str = "QUADS"           # QUADS | TRIS (FORGE only; QuadriFlow always makes quads)
     density_group: str = ""         # vertex group that asks FORGE for finer faces (weight 1 = finest)
     density_ratio: float = 4.0      # how many times shorter the edges are where the weight is 1
+    subdivision_match: bool = False  # move the control points so the Subdivision Surface limit lies on the source
+    zone_factors: dict = dataclasses.field(default_factory=dict)  # zone name -> detail multiplier (2 = twice as fine)
     use_flow_guides: bool = True    # edges marked with Mark Flow Guide pull the quad rows along them (soft hint)
     curvature_detail: str = "OFF"   # OFF | LOW | MEDIUM | HIGH: smaller faces on strongly curved areas (eyes, lips, ear rims)
 
@@ -232,7 +236,7 @@ def _bounding_box_diagonal(evaluated_object) -> float:
 def _wants_surface_tree(settings: RemeshSettings, uses_zones: bool) -> bool:
     """The BVH tree costs time and memory, so only build it when something will use it."""
     symmetry_check = settings.check_symmetry and (settings.sym_x or settings.sym_y or settings.sym_z)
-    return settings.use_reproject or symmetry_check or uses_zones
+    return settings.use_reproject or symmetry_check or uses_zones or settings.subdivision_match
 
 
 def _read_source(context, original, settings: RemeshSettings, uses_zones: bool,
@@ -285,20 +289,64 @@ def collect_guides(mesh, plan=None):
     return segments
 
 
-def _attach_density(mesh, original, settings: RemeshSettings, warnings: list) -> None:
-    """Turn a vertex group into the per-vertex edge-length multiplier FORGE reads (1 = normal, <1 = finer)."""
-    if not settings.density_group:
+def _zone_multiplier(mesh, settings: RemeshSettings, zone_labels, zone_names: dict):
+    """Per-vertex edge-length multiplier from the per-zone detail factors, or None. A vertex on a border takes the finer side."""
+    if zone_labels is None or not settings.zone_factors:
+        return None
+    face_multiplier = np.ones(len(zone_labels), dtype=np.float64)
+    for label, name in zone_names.items():
+        factor = float(settings.zone_factors.get(name, 1.0))
+        if factor != 1.0:
+            face_multiplier[zone_labels == label] = 1.0 / max(0.05, factor)
+    if np.all(face_multiplier == 1.0):
+        return None
+    arrays = mio.read_mesh_arrays(mesh)
+    sizes = np.diff(arrays.poly_offsets)
+    face_of_loop = np.repeat(np.arange(len(sizes)), sizes)
+    vertex_multiplier = np.ones(len(mesh.vertices), dtype=np.float64)
+    np.minimum.at(vertex_multiplier, arrays.loop_verts, face_multiplier[face_of_loop])
+    return _blend_across_zone_borders(vertex_multiplier, arrays, len(sizes), settings.target_quads)
+
+
+def _blend_across_zone_borders(multiplier, arrays, n_faces: int, target_quads: int):
+    """Spread the step at a zone border over about eight quad cells. The engine follows a gradual change in density
+    but gives up on a sudden jump, so a plain per-zone value would be ignored."""
+    edges = arrays.edges
+    if edges is None or len(edges) == 0:
+        return multiplier
+    rings_per_cell = max(1.0, math.sqrt(n_faces / max(1, target_quads)))
+    iterations = int(min(400, max(10, (8.0 * rings_per_cell) ** 2)))
+    a, b = edges[:, 0], edges[:, 1]
+    degree = np.bincount(a, minlength=len(multiplier)) + np.bincount(b, minlength=len(multiplier)) + 1.0
+    value = np.log(multiplier)
+    for _ in range(iterations):
+        total = value.copy()
+        np.add.at(total, a, value[b])
+        np.add.at(total, b, value[a])
+        value = total / degree
+    return np.exp(value)
+
+
+def _attach_density(mesh, original, settings: RemeshSettings, warnings: list, zone_labels=None, zone_names=None) -> None:
+    """Build the per-vertex edge-length multiplier FORGE reads (1 = normal, <1 = finer) from the density vertex group
+    and the per-zone detail factors (the finer of the two wins)."""
+    multiplier = None
+    if settings.density_group:
+        group = original.vertex_groups.get(settings.density_group)
+        if group is None:
+            warnings.append(f"The vertex group '{settings.density_group}' does not exist, so the density is ignored.")
+        else:
+            weights = mio.read_vertex_group_weights(mesh, group.index)
+            if weights is None or not weights.any():
+                warnings.append(f"The vertex group '{settings.density_group}' is empty, so the density is ignored.")
+            else:
+                ratio = max(1.0, float(settings.density_ratio))
+                multiplier = 1.0 / (1.0 + (ratio - 1.0) * np.clip(weights, 0.0, 1.0))
+    by_zone = _zone_multiplier(mesh, settings, zone_labels, zone_names or {})
+    if by_zone is not None:
+        multiplier = by_zone if multiplier is None else np.minimum(multiplier, by_zone)
+    if multiplier is None:
         return
-    group = original.vertex_groups.get(settings.density_group)
-    if group is None:
-        warnings.append(f"The vertex group '{settings.density_group}' does not exist, so the density is ignored.")
-        return
-    weights = mio.read_vertex_group_weights(mesh, group.index)
-    if weights is None or not weights.any():
-        warnings.append(f"The vertex group '{settings.density_group}' is empty, so the density is ignored.")
-        return
-    ratio = max(1.0, float(settings.density_ratio))
-    multiplier = 1.0 / (1.0 + (ratio - 1.0) * np.clip(weights, 0.0, 1.0))
     attribute = mesh.attributes.get(DENSITY_ATTRIBUTE)
     if attribute is not None:
         mesh.attributes.remove(attribute)
@@ -857,14 +905,14 @@ def run_steps(context, original, settings: RemeshSettings,
         wants_zone_data = settings.transfer_zones and zonedata.has_sculpt_data(mesh)
         data_source = temp.track_mesh(mesh.copy()) if (wants_uvs or wants_zone_data) else None
 
-        if forge:
-            _attach_density(mesh, original, settings, warnings)
-
         progress(12, "Reading zones")
         yield
         with profiler.stage("Zone labels"):
             zone_labels = _compute_zone_labels(mesh, original, settings, warnings) if uses_zones else None
             zone_names = _zone_names(mesh, original, settings, zone_labels) if zone_labels is not None else {}
+
+        if forge:
+            _attach_density(mesh, original, settings, warnings, zone_labels, zone_names)
 
         progress(20, "Making the working copy")
         yield
@@ -950,6 +998,15 @@ def run_steps(context, original, settings: RemeshSettings,
                         if several_levels else f"{original.name}_{kind}")
                 final_mesh = _mirror_halves_into_final_mesh(
                     half_mesh, plan, proxy_stats["border_edges"] == 0, original, name, settings)
+                if settings.subdivision_match and settings.output == "QUADS" and source.surface_tree is not None:
+                    try:
+                        sharp = mio.read_edge_flag(final_mesh, "use_edge_sharp") \
+                            if len(final_mesh.edges) else None
+                        outcome = subdfit.fit_to_limit_surface(final_mesh, source.surface_tree, plan, sharp)
+                        if outcome is None:
+                            warnings.append("Subdivision match was skipped: the result has triangles or n-gons.")
+                    except Exception as error:  # noqa: BLE001
+                        warnings.append(f"Subdivision match failed ({error!r}); the result is unchanged.")
                 result_object = _create_result_object(context, original, final_mesh, name)
                 if data_source is not None and wants_uvs:
                     try:

@@ -62,7 +62,11 @@ inline std::vector<float> thicknessSizeField(const TriSoup& soup, const SizeFiel
         for (int k = 0; k < 3; ++k) N[t[k]] += n;
     }
     for (auto& n : N) n = normalized(n);
-    const double rmax = 0.5 * length(box.hi - box.lo);
+    // A ball wider than rho / ratio asks for no refinement at all (the size is clamped to 1 there), so the search
+    // starts at that radius instead of the size of the model: the query point stays close to the surface, where the
+    // BVH prunes well. Seen from the centre of a ball-like shape every triangle is about equally far, which made
+    // this stage take a minute on 80,000 triangles.
+    const double rmax = std::min(0.5 * length(box.hi - box.lo), sp.rho / sp.ratio * 1.05);
     SurfaceIndex idx;
     idx.build(soup.P, soup.F);
     std::vector<double> radius(nV, rmax);

@@ -1,6 +1,6 @@
 # FORGE: field-aligned integer-grid quad remeshing inside Blender
 
-**Technical report for QuadForge Vivaldi 0.10.31** · GPL-3.0-or-later · November 2026
+**Technical report for QuadForge Vivaldi 0.11.0** · GPL-3.0-or-later · November 2026
 
 > **What this document is.** A description of how the QuadForge add-on and its FORGE engine turn an arbitrary triangle or
 > polygon mesh into a clean quad mesh. It is a **technical report, not a peer-reviewed paper**. FORGE does not claim a new
@@ -117,7 +117,16 @@ A vertex group can ask for smaller faces. The group weight *w* ∈ [0,1] becomes
 
 $$ s = \frac{1}{1 + (r-1)\,w} $$
 
-where *r* is the user's "detail ratio": *s* = 1 where *w* = 0 (normal size) and *s* = 1/*r* where *w* = 1. Edges the
+where *r* is the user's "detail ratio": *s* = 1 where *w* = 0 (normal size) and *s* = 1/*r* where *w* = 1.
+
+The same multiplier carries the per-zone detail factors: a zone with factor *k* gets *s* = 1/*k*, a vertex on a zone
+border takes the finer side, and log *s* is then diffused over a few hundred Jacobi steps (about eight quad cells), because
+the engine's parametrization follows a gradual change but gives up on a sudden jump at a constrained border. Even so,
+the integer-grid fit limits the effect: a factor of 2 (edges half as long) produced about 1.7 times more faces in the
+zone on the test sphere, not 4. The engine accepts a density power when its fit error is within 12 % + 0.02 of the plain
+fit, instead of the absolute 0.45 limit alone, since models with many constrained borders already sit near that limit.
+
+Edges the
 user marked as flow guides are passed to the engine as line segments; they pull the cross field (section 4.4) as a
 soft hint, never as a hard constraint.
 
@@ -162,7 +171,10 @@ Without help, a uniform grid under-resolves thin parts. `sizefield.hpp` computes
   surface there and stays inside the shape is found (half the local thickness of a tube or plate). A tube of radius *a*
   needs about eight quads around it, so the quad edge is limited to `ratio · r` (default ratio 1.3, never finer than
   half the global size). The refinement applies only where the surface is also curved (tubes, not flat walls). For
-  dense inputs the ball is measured on a sample of vertices and propagated over the surface.
+  dense inputs the ball is measured on a sample of vertices and propagated over the surface. The search starts at radius
+  `rho / ratio`, not at the size of the model: a wider ball asks for no refinement, and from a point deep inside a
+  ball-like shape every triangle is about equally far, so a BVH cannot prune (this stage took a minute on 80,000
+  triangles before; it takes under a second now, with identical results on the test suite).
 * **Curvature** (user option "Detail on Curves"): a quad edge should not turn the surface by more than a given angle, so
   the edge length is limited to *angle / curvature* (curvature smoothed over about half a quad so mesh noise does not
   count). This puts smaller faces on eyelids, lips, nostrils and ear rims.

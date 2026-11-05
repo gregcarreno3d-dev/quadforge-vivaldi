@@ -4,3 +4,4 @@ dist/
 quadforge/devtools/engine_tests/out/
 tests/out/
 *.zip
+engine/bin/

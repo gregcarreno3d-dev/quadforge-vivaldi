@@ -2,7 +2,7 @@
 import math
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
 
 from .core.pipeline import RemeshSettings
 
@@ -33,6 +33,18 @@ def apply_surface_profile(settings, key: str) -> bool:
     finally:
         _applying_profile = False
     return True
+
+
+class QuadForgeZoneFactor(bpy.types.PropertyGroup):
+    """Detail multiplier of one zone (listed by Refresh Zones in the Density panel)."""
+
+    name: StringProperty(name="Zone", default="")
+    factor: FloatProperty(
+        name="Detail",
+        description="How much finer (above 1) or coarser (below 1) the faces of this zone are compared with the rest. "
+                    "2 gives roughly 1.7 times more faces in the zone (the engine changes the density gradually to keep clean quads)",
+        default=1.0, min=0.25, max=4.0, precision=2,
+    )
 
 
 class QuadForgeProperties(bpy.types.PropertyGroup):
@@ -76,6 +88,8 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
                     "(4 means four times finer, so about 16 times more faces there)",
         default=4.0, min=1.0, max=16.0, precision=1,
     )
+
+    zone_factors: CollectionProperty(type=QuadForgeZoneFactor)
 
     use_flow_guides: BoolProperty(
         name="Use Flow Guides",
@@ -129,6 +143,14 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         description="Faces of the working copy. Use at least 3 to 4 times the target to keep the detail",
         default=80_000, min=10_000, soft_max=400_000, max=2_000_000,
     )
+    subdivision_match: BoolProperty(
+        name="Subdivision Match",
+        description="Move the vertices so that, once you add a Subdivision Surface modifier, the smooth result lies on "
+                    "your original surface instead of shrinking inside it. Made for smooth, organic shapes; quads only. Sharp creases "
+                    "stay where they are, and no point moves more than a third of an edge",
+        default=False,
+    )
+
     use_reproject: BoolProperty(
         name="Keep Sculpt Detail",
         description="Snap the result back onto your original sculpt so it follows every curve and corner",
@@ -324,12 +346,14 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
             output="QUADS" if self.backend != "FORGE" else self.output_type,
             density_group=self.density_group,
             density_ratio=self.density_ratio,
+            zone_factors={item.name: item.factor for item in self.zone_factors if abs(item.factor - 1.0) > 1e-6},
             curvature_detail=self.curvature_detail,
             use_flow_guides=self.use_flow_guides,
             use_proxy=self.use_proxy,
             proxy_auto=self.proxy_auto,
             proxy_faces=self.proxy_faces,
             use_reproject=self.use_reproject,
+            subdivision_match=self.subdivision_match,
             polish_passes=self.polish_passes,
             use_sharp_angle=self.use_sharp_angle,
             sharp_angle_deg=math.degrees(self.sharp_angle),

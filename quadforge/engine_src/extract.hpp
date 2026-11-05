@@ -238,6 +238,7 @@ inline bool Extractor::run(PolyMesh& out, ExtractStats& st, std::string& err) {
         bool hasDens = false;
         for (int v : ids_) if (std::fabs(m_.vdens[v] - 1.0f) > 1e-3f) { hasDens = true; break; }
         if (std::getenv("FORGE_DBG")) { float lo = 1e9f, hi = -1e9f; for (int v : ids_) { lo = std::min(lo, m_.vdens[v]); hi = std::max(hi, m_.vdens[v]); } std::fprintf(stderr, "vdens range %.3f..%.3f hasDens %d pow %.2f\n", lo, hi, hasDens, densPow_); }
+        std::vector<std::pair<double, double>> tried;   // (density power, fit) of the attempts that were too poor
         for (int attempt = 0; attempt < 5; ++attempt) {
             IntegerParam::Options po;
             po.alignFeatures = prm_.alignFeatures;
@@ -251,8 +252,30 @@ inline bool Extractor::run(PolyMesh& out, ExtractStats& st, std::string& err) {
             // makes the fit fail: follow only part of it instead
             if (!paramOk || !hasDens || densPow_ <= 0.0 || pr.faceError <= 0.45) break;
             if (std::getenv("FORGE_DBG")) std::fprintf(stderr, "param: density fit %.3f too poor at power %.2f, softening\n", pr.faceError, densPow_);
+            tried.push_back({densPow_, pr.faceError});
             densPow_ = densPow_ > 0.3 ? densPow_ * 0.5 : 0.0;
             pr.warm.clear(); pr.warmRho = 0;
+        }
+        // The 0.45 limit is absolute, but a model with many constrained borders (zones, creases) can already sit above
+        // it with little or no density. Then judge the density by what it adds: if a larger power costs only a little
+        // more than the plain fit, use it.
+        if (paramOk && hasDens && !tried.empty()) {
+            const double base = pr.faceError;
+            for (const auto& t : tried) {
+                if (t.second <= base * 1.12 + 0.02) {
+                    if (std::getenv("FORGE_DBG")) std::fprintf(stderr, "param: plain fit %.3f, taking density power %.2f (fit %.3f)\n", base, t.first, t.second);
+                    densPow_ = t.first;
+                    IntegerParam::Options po;
+                    po.alignFeatures = prm_.alignFeatures;
+                    po.densityPower = densPow_;
+                    po.timeLimit = prm_.paramTimeLimit;
+                    po.threads = prm_.threads;
+                    ParamResult again;
+                    IntegerParam ip(m_, pfr, zf_, po);
+                    if (ip.run(rho, again)) pr = again; else densPow_ = std::max(0.0, densPow_ * 0.5);
+                    break;
+                }
+            }
         }
         if (paramOk && pr.badSeams > 0 && ((prm_.seamRetry && !std::getenv("FORGE_NORETRY")) || std::getenv("FORGE_RETRY"))) {
             // a few cut junctions did not close (integer defect): a slightly different cell size usually rounds cleanly.

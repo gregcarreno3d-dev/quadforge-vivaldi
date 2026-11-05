@@ -13,6 +13,22 @@ from .presets import PRESETS
 
 BYTES_PER_GB_IN_MB = 1024.0
 
+PREVIEW_FACES = 3000
+PREVIEW_TAG = "quadforge_preview_of"
+
+
+def remove_previews(original_name: str) -> int:
+    """Delete the preview objects (and their meshes) made for ``original_name``. Returns how many were removed."""
+    removed = 0
+    for obj in list(bpy.data.objects):
+        if obj.get(PREVIEW_TAG) == original_name:
+            mesh = obj.data
+            bpy.data.objects.remove(obj, do_unlink=True)
+            if mesh is not None and mesh.users == 0:
+                bpy.data.meshes.remove(mesh)
+            removed += 1
+    return removed
+
 
 def _store_last_report(settings, result: pipeline.RemeshResult) -> None:
     """Keep the numbers of the last run so the 'Last Result' panel can show them."""
@@ -117,6 +133,7 @@ class QUADFORGE_OT_remesh(bpy.types.Operator):
             window_manager.progress_end()
             _set_status_text(context, None)
 
+        remove_previews(original.name)
         _store_last_report(scene_settings, result)
         _report_result(self, result)
         return {"FINISHED"}
@@ -132,6 +149,7 @@ class QUADFORGE_OT_remesh_modal(bpy.types.Operator):
 
     _generator = None
     _timer = None
+    _original_name = ""
 
     @classmethod
     def poll(cls, context):
@@ -140,6 +158,7 @@ class QUADFORGE_OT_remesh_modal(bpy.types.Operator):
 
     def invoke(self, context, event):
         original = context.active_object
+        self._original_name = original.name
         if original.mode != "OBJECT":
             bpy.ops.object.mode_set(mode="OBJECT")
         scene_settings = context.scene.quadforge
@@ -179,6 +198,7 @@ class QUADFORGE_OT_remesh_modal(bpy.types.Operator):
         except StopIteration as done:
             self._generator = None
             self._stop(context)
+            remove_previews(self._original_name)
             _store_last_report(context.scene.quadforge, done.value)
             _report_result(self, done.value)
             return {"FINISHED"}
@@ -199,6 +219,84 @@ class QUADFORGE_OT_remesh_modal(bpy.types.Operator):
             self._generator.close()
             self._generator = None
         self._stop(context)
+
+
+class QUADFORGE_OT_preview(bpy.types.Operator):
+    """Make a quick low-resolution version (about 3,000 faces) with your current settings, to check the flow before the full run"""
+    bl_idname = "quadforge.preview"
+    bl_label = "Quick Preview"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH" and active.get(PREVIEW_TAG) is None
+
+    def execute(self, context):
+        original = context.active_object
+        if original.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        scene_settings = context.scene.quadforge
+        settings = scene_settings.to_settings()
+        settings.target_quads = min(settings.target_quads, PREVIEW_FACES)
+        settings.extra_levels = ""
+        settings.hide_original = False
+        settings.transfer_uvs = False
+        settings.transfer_zones = False
+        remove_previews(original.name)
+        started = time.perf_counter()
+        try:
+            result = pipeline.run(context, original, settings)
+        except pipeline.PipelineError as error:
+            self.report({"ERROR"}, str(error))
+            return {"CANCELLED"}
+        except Exception as error:  # noqa: BLE001 - never take Blender down with us
+            self.report({"ERROR"}, f"Unexpected error: {error!r}")
+            return {"CANCELLED"}
+        preview = result.levels[0].object
+        preview.name = f"{original.name}_preview"
+        preview.data.name = preview.name
+        preview[PREVIEW_TAG] = original.name
+        # the original stays the active, selected object so the next click on Remesh works on it
+        for obj in context.selected_objects:
+            obj.select_set(False)
+        original.select_set(True)
+        context.view_layer.objects.active = original
+        self.report({"INFO"}, f"Preview with {len(preview.data.polygons)} faces in "
+                              f"{time.perf_counter() - started:.1f} s. It is deleted when you run the full Remesh.")
+        return {"FINISHED"}
+
+
+class QUADFORGE_OT_refresh_zones(bpy.types.Operator):
+    """List the zones of the active mesh (from the zone options that are on) so each can get its own detail level"""
+    bl_idname = "quadforge.refresh_zones"
+    bl_label = "Refresh Zones"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH"
+
+    def execute(self, context):
+        original = context.active_object
+        scene_settings = context.scene.quadforge
+        settings = scene_settings.to_settings()
+        mesh = original.data
+        warnings: list = []
+        labels = pipeline._compute_zone_labels(mesh, original, settings, warnings)
+        if labels is None:
+            self.report({"WARNING"}, "Turn on at least one option in Isolate Zones (materials, Face Sets, mask or vertex groups) first.")
+            return {"CANCELLED"}
+        names = pipeline._zone_names(mesh, original, settings, labels)
+        kept = {item.name: item.factor for item in scene_settings.zone_factors}
+        scene_settings.zone_factors.clear()
+        for label in sorted(names):
+            item = scene_settings.zone_factors.add()
+            item.name = names[label]
+            item.factor = kept.get(item.name, 1.0)
+        self.report({"INFO"}, f"{len(names)} zones listed.")
+        return {"FINISHED"}
 
 
 def guide_edge_count(obj) -> int:

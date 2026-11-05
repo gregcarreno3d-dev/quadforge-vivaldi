@@ -28,13 +28,15 @@ from .operators import (
     QUADFORGE_OT_apply_preset,
     QUADFORGE_OT_clear_guides,
     QUADFORGE_OT_mark_guides,
+    QUADFORGE_OT_preview,
+    QUADFORGE_OT_refresh_zones,
     QUADFORGE_OT_remesh,
     QUADFORGE_OT_remesh_modal,
     QUADFORGE_OT_reset_settings,
     QUADFORGE_OT_set_surface,
     QUADFORGE_OT_set_target,
 )
-from .properties import QuadForgeProperties
+from .properties import QuadForgeProperties, QuadForgeZoneFactor
 from .ui import (
     QUADFORGE_MT_target,
     QUADFORGE_PT_advanced,
@@ -52,9 +54,12 @@ from .ui import (
 
 # Parent panel first: Blender needs it registered before its sub-panels.
 _CLASSES = (
+    QuadForgeZoneFactor,
     QuadForgeProperties,
     QUADFORGE_OT_remesh,
     QUADFORGE_OT_remesh_modal,
+    QUADFORGE_OT_preview,
+    QUADFORGE_OT_refresh_zones,
     QUADFORGE_OT_apply_preset,
     QUADFORGE_OT_reset_settings,
     QUADFORGE_OT_set_surface,

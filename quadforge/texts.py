@@ -102,6 +102,10 @@ LABEL_GUIDE_NONE = "No guide edges yet. Select edges in Edit Mode and press Mark
 HELP_DENSITY = (
     "Paint a vertex group in Weight Paint mode: the faces get smaller where the weight is high and stay "
     "normal where it is 0. Pick the group here.")
+HELP_ZONE_DETAIL = (
+    "Give each zone its own detail level. First turn on an option in Isolate Zones, then press Refresh Zones "
+    "and set a number per zone: above 1 gives that zone more faces, below 1 fewer. The engine keeps a clean quad "
+    "flow, so the change is gradual (a 2 gives roughly 1.7 times more faces in the zone).")
 LABEL_NO_GROUPS = "This object has no vertex groups yet."
 
 # ---------------------------------------------------------------- last result panel

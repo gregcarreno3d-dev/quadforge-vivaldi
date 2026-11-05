@@ -119,6 +119,11 @@ SPANISH_FROM_TEXTS = {
     texts.HELP_DENSITY: (
         "Pinta un vertex group en modo Weight Paint: las caras serán más pequeñas donde el peso es alto y "
         "normales donde es 0. Elige el grupo aquí."),
+    texts.HELP_ZONE_DETAIL: (
+        "Da a cada zona su propio nivel de detalle. Primero activa una opción en Aislar zonas, luego pulsa "
+        "Actualizar zonas y fija un número por zona: por encima de 1 esa zona tiene más caras, por debajo menos. "
+        "El motor mantiene un flujo limpio de quads, así que el cambio es gradual (un 2 da aproximadamente "
+        "1,7 veces más caras en la zona)."),
     texts.HELP_GUIDES: (
         "Las guías de flujo le dicen al motor por dónde quieres que corran las filas de quads, por ejemplo "
         "alrededor de un ojo o a lo largo de la mandíbula. En Modo Edición selecciona aristas de tu modelo y "
@@ -162,6 +167,12 @@ SPANISH_INTERFACE = {
     "Advanced": "Avanzado",
     "Axes": "Ejes",
     "Remesh": "Remallar",
+    "Detail by Zone": "Detalle por zona",
+    "Refresh Zones": "Actualizar zonas",
+    "Subdivision Match": "Ajuste para subdivisión",
+    "Move the vertices so that, once you add a Subdivision Surface modifier, the smooth result lies on your original surface instead of shrinking inside it. Made for smooth, organic shapes; quads only. Sharp creases stay where they are, and no point moves more than a third of an edge": "Mueve los vértices para que, al añadir un modificador Subdivision Surface, el resultado suave quede sobre tu superficie original en vez de encogerse. Pensado para formas orgánicas suaves; solo quads. Los pliegues marcados no se mueven y ningún punto se desplaza más de un tercio de arista",
+    "Quick Preview": "Vista previa rápida",
+    "Make a quick low-resolution version (about 3,000 faces) with your current settings, to check the flow before the full run": "Crea una versión rápida de baja resolución (unas 3.000 caras) con tus ajustes actuales, para revisar el flujo antes del remallado completo",
     "Engine": "Motor",
     "Output": "Salida",
     "Quads": "Quads",

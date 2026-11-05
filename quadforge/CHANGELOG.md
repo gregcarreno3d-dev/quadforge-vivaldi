@@ -1,11 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 - 2026-11-05
 
-- Fixed: with symmetry, a large hole on the centre seam (several quads lost together, 14 or more open edges) is now closed with triangles instead of left open. A stress test that deletes 1 to 4 quads next to the seam failed in 25 of 150 cases before and in none now.
+New
+- **Quick Preview** button: a small copy (about 3,000 faces, 1 to 3 seconds) made with your current settings, to check the flow before the full run. Your original is not touched; the preview is replaced by the next one and deleted when you run the full Remesh.
+- **Detail by Zone**: after *Refresh Zones*, give each zone (material, Face Set, mask or vertex group) its own detail level. The engine keeps a clean quad flow, so a factor of 2 gives roughly 1.7 times more faces in the zone, blended over about eight cells at the border.
+- **Subdivision Match** (Advanced, off by default): moves the vertices of a quad result so that, once Subdivision Surface is added, the smooth surface lands on the original instead of shrinking inside it (test: error after two levels 0.084 % to 0.002 % of the model size). Symmetry stays exact; creases stay put.
+
+Engine
+- Much faster on dense, round inputs with a low target: the local-thickness search started at the size of the whole model, and from the centre of a ball-like shape every triangle is equally far. It now starts at the radius that matters. An 82,000-triangle sphere to 3,000 quads went from 61 s to 0.9 s, and to 20,000 quads from 60 s to 4 s. All test results are unchanged.
+- A density gradient is no longer dropped when the model already sits near the fit limit because of its many constrained borders (zones, creases).
+
+Fixed
+- With symmetry, a large hole on the centre seam (several quads lost together, 14 or more open edges) is closed with triangles instead of left open. A stress test that deletes 1 to 4 quads next to the seam failed in 25 of 150 cases before and in none now.
+
+Testing
 - Tested on Blender 4.2.0, 4.5.15 LTS, 5.1.2 and 5.2 through the `bpy` module (all suites and the 67-case matrix pass); CI now runs the add-on on 4.2, 4.5 and 5.1.
+- Four new engine hard cases (thin plate, long rod, finned sphere, hollow double-wall shell): 29 in total. New add-on tests for the preview, Detail by Zone, Subdivision Match and a synthetic head.
 - The manifest declares the `files` permission (temporary files to run the bundled engine).
-- Four new engine hard cases (thin plate, long rod, finned sphere, hollow double-wall shell): 29 in total, all pass.
+
+Tried and not adopted
+- Multigrid solver for the parametrization: 4 times slower than the conjugate gradient at 100,000 quads (141 s against 32 s).
+- Local pole clean-up: only 2 to 4 adjacent 3-5 pole pairs per 20,000 quads; not worth the risk.
 
 ## 0.10.31
 

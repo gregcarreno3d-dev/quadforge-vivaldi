@@ -8,6 +8,7 @@ A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its
 - Reads heavy sculpts directly, keeps hard edges, symmetry, UV maps, Face Sets and materials
 - Isolate zones by material, Face Set, mask or vertex group
 - Paintable density through a vertex group; smaller faces on thin parts and, optionally, on strongly curved details
+- Quick Preview before the full run, detail per zone, and an option that makes the result match your sculpt after Subdivision Surface
 - Exact symmetry (no open seam), several levels of detail in one run, cancel with Esc
 - English and Spanish interface
 - Blender 4.2 or newer (developed and tested on Blender 5.2). GPL-3.0-or-later.
@@ -60,6 +61,7 @@ problem or fall back rather than return an invalid mesh.
 | [**Technical report**](docs/TECHNICAL_REPORT.md) | The method in depth: equations, algorithms, evaluation against Blender's QuadriFlow and Decimate, limitations, how FORGE differs from the published methods, and references |
 | [**Architecture for AI assistants**](docs/ARCHITECTURE_FOR_AI.md) | A dense, exact map of the code for any AI (or contributor) that needs to understand or change it: file map, data flow, formats, decision flow, invariants, tests |
 | [User guide](quadforge/docs/USER_GUIDE.md) | Using the add-on |
+| [Testing guide](docs/TESTING_GUIDE.md) | A 30-minute checklist for people trying the add-on on their own machine and models |
 | [Status and limits](quadforge/docs/STATUS_AND_LIMITS.md) | What is tested, measured and not done yet |
 | [Changelog](quadforge/CHANGELOG.md) | Version history |
 

@@ -184,6 +184,9 @@ class QUADFORGE_PT_main(_QuadForgePanel, bpy.types.Panel):
         remesh_row.scale_y = 1.6
         remesh_row.enabled = guidance.can_remesh(messages)
         remesh_row.operator("quadforge.remesh", icon="MESH_GRID")
+        preview_row = layout.row()
+        preview_row.enabled = remesh_row.enabled
+        preview_row.operator("quadforge.preview", icon="HIDE_OFF")
 
         layout.separator()
         draw_wrapped_text(layout, context, _describe_active_options(settings), icon="PREFERENCES")
@@ -360,6 +363,13 @@ class QUADFORGE_PT_density(_QuadForgePanel, bpy.types.Panel):
         column.active = bool(settings.density_group)
         column.prop(settings, "density_ratio")
         layout.separator()
+        box = layout.box()
+        box.label(text="Detail by Zone")
+        draw_wrapped_text(box, context, translate(texts.HELP_ZONE_DETAIL))
+        box.operator("quadforge.refresh_zones", icon="FILE_REFRESH")
+        for item in settings.zone_factors:
+            box.prop(item, "factor", text=item.name)
+        layout.separator()
         draw_wrapped_text(layout, context, translate(texts.HELP_CURVATURE))
         layout.prop(settings, "curvature_detail")
 
@@ -390,6 +400,7 @@ class QUADFORGE_PT_speed(_QuadForgePanel, bpy.types.Panel):
 
         layout.separator()
         layout.prop(settings, "use_reproject")
+        layout.prop(settings, "subdivision_match")
         polish = layout.column()
         polish.active = settings.use_reproject
         polish.prop(settings, "polish_passes")

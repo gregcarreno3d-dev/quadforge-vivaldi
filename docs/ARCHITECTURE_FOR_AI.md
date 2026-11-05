@@ -1,6 +1,6 @@
 # QuadForge Vivaldi: architecture and behaviour, written for AI assistants
 
-Version described: **0.10.31**. Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.11.0**. Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -28,7 +28,8 @@ quadforge/                    the add-on (this folder is what Blender installs)
   properties.py               QuadForgeProperties: every user setting (bpy PropertyGroup)
   ui.py                       panels: QUADFORGE_PT_main, _hard_edges, _guides, _zones, _symmetry, _levels, _density,
                               _speed, _last_result, _how_to_use, _advanced
-  operators.py                quadforge.remesh, quadforge.remesh_modal (Esc cancels), mark_guides, clear_guides,
+  operators.py                quadforge.remesh, quadforge.remesh_modal (Esc cancels), quadforge.preview (about 3,000 faces, tagged
+                              `quadforge_preview_of`, removed by the next full remesh), refresh_zones, mark_guides, clear_guides,
                               apply_preset, set_surface, set_target, reset_settings
   presets.py                  PRESETS (Prop 2K ... Detail 120K, Ladder), SURFACE_PROFILES (Hard / Organic)
   planning.py                 target-list parsing ("20K, 15K, 10K"), working-copy sizing (pure Python, no bpy)
@@ -74,8 +75,10 @@ Stages, in order (names are the profiler stage names):
 
 1. **Read source** `_read_source`: evaluated mesh (modifiers applied), BVH tree of the surface. The original object is
    never modified.
-2. **Density** `_attach_density` (FORGE only): vertex group → point attribute `quadforge_density`,
-   `multiplier = 1 / (1 + (ratio - 1) * weight)`.
+2. **Density** `_attach_density` (FORGE only, runs after the zone labels): vertex group → `multiplier = 1 / (1 + (ratio - 1) * weight)`,
+   combined with the per-zone detail factors (`_zone_multiplier`: `1/factor` per face, a border vertex takes the finer
+   side, then `_blend_across_zone_borders` diffuses log(multiplier) over about 8 quad cells, because the engine ignores a
+   sudden jump); the finer of the two wins. Written as the point attribute `quadforge_density`.
 3. **Zone labels** `_compute_zone_labels` (if any zone option is on): face attribute `quadforge_zone` (integer).
    Sources: materials, Face Sets, mask (threshold), vertex groups (mean weight per face, argmax, `-1` below
    `group_cutoff`).
@@ -231,7 +234,8 @@ write .fmesh, print S line, print OK
 
 Cross-field resolution: when the working mesh has more than 12,000 faces the field is solved on a coarser copy
 (`max(2000, faces/4)`) and transferred. The parametrization attempts up to 5 times, softening the density power
-(1, 0.5, 0.25, 0) when the fit error exceeds 0.45; above 0.5 the result is rejected. Time limit `--time-limit`
+(1, 0.5, 0.25, 0) when the fit error exceeds 0.45; if the plain fit is itself near the limit (models with many constrained borders), the
+highest power whose fit is within 12 % + 0.02 of the plain fit is taken instead (`extract.hpp`). Above 0.5 the result is rejected. Time limit `--time-limit`
 (default 900 s) aborts a solve.
 
 ### 4.2 Extraction in one paragraph
@@ -258,6 +262,8 @@ merge valence-2 dead ends (≤ 6 rounds), `improveQuads(..., 40 sweeps, threshol
 | `use_materials`, `use_face_sets`, `use_mask`, `mask_threshold`, `use_vertex_groups`, `group_cutoff` | zones; borders become hard edges |
 | `sym_x/y/z`, `sym_side`, `sym_center`, `sym_tolerance`, `check_symmetry` | symmetry |
 | `density_group`, `density_ratio` (4) | vertex-group density |
+| `zone_factors` (collection of name/factor, filled by *Refresh Zones*) | Detail by Zone: factor 0.25–4 per zone |
+| `subdivision_match` | after the final mesh is built, `core/subdfit.py` moves vertices to the Catmull-Clark limit surface (quads only) |
 | `curvature_detail` | OFF/LOW/MEDIUM/HIGH → `--curv-adapt`; off by default (it raises irregular vertices on purpose) |
 | `use_flow_guides` | pass Mark Flow Guide edges to the engine |
 | `transfer_uvs`, `transfer_zones` | UV maps, Face Sets and mask copied to the result |
@@ -298,9 +304,9 @@ on, Detail on Curves off) and **Organic**. Presets set target and angle and neve
 | Suite | Where | What |
 |---|---|---|
 | Engine robustness | `quadforge/devtools/engine_tests/t07_robustness.py` (`--quick`: 41 cases) | generated shapes, odd targets, hard-surface parts; independent validity checks |
-| Engine hard cases | `.../t08_hard_cases.py` (25 cases) | open surfaces, parts, dirty input, odd scales, dense scans, density, triangles |
+| Engine hard cases | `.../t08_hard_cases.py` (29 cases) | open surfaces, parts, dirty input, odd scales, dense scans, density, triangles |
 | Engine basics | `t01`–`t06` | sphere, suite, repair fuzz, pairing, extraction |
-| Add-on in Blender | `quadforge/tests/blender_integration_test.py` (29), `blender_matrix_test.py` (67), `blender_forge_test.py`, `blender_guides_test.py`, `blender_uv_test.py`, `blender_zones_test.py`, `blender_vgzones_test.py`, `blender_surface_test.py`, `blender_hard_test.py` | run with the `bpy` module (`pip install bpy numpy scikit-image`); the Linux engine must be in `quadforge/bin/linux/` |
+| Add-on in Blender | `quadforge/tests/blender_integration_test.py` (29), `blender_matrix_test.py` (67), `blender_forge_test.py`, `blender_guides_test.py`, `blender_uv_test.py`, `blender_zones_test.py`, `blender_vgzones_test.py`, `blender_surface_test.py`, `blender_hard_test.py`, `blender_preview_test.py`, `blender_zone_detail_test.py`, `blender_subdiv_test.py`, `blender_head_test.py` (synthetic head) | run with the `bpy` module (`pip install bpy numpy scikit-image`); the Linux engine must be in `quadforge/bin/linux/` |
 | Pure Python | `test_features.py`, `test_geometry.py`, `test_planning.py`, `test_guidance.py`, `test_forge_backend.py` | no Blender needed (the last one runs the real engine) |
 | Metrics | `tools/quality_metrics.py` | scaled Jacobian, irregular share, distance to source |
 
