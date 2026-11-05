@@ -21,6 +21,9 @@ copyright = [
   "2026 Gregorio Carreño",
 ]
 
+[permissions]
+files = "Temporary files to run the bundled engine"
+
 [build]
 paths_exclude_pattern = [
   "__pycache__/",

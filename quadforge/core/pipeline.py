@@ -725,6 +725,9 @@ def _mirror_halves_into_final_mesh(half_mesh, plan: sym.SymmetryPlan, input_was_
                 if gaps:
                     filled = list(bmesh.ops.holes_fill(bm, edges=gaps, sides=12)["faces"])
                     filled += _fill_small_loops(bm, _seam_gaps())   # what holes_fill refused (flat slivers)
+                    left = _seam_gaps()
+                    if left:  # a larger hole (several quads lost together): close it too, as triangles, rather than leave it open
+                        filled += list(bmesh.ops.holes_fill(bm, edges=left, sides=max(64, len(left)))["faces"])
                     big = [face for face in filled if face.is_valid and len(face.verts) > 4]
                     if big:  # keep the result quads and triangles only
                         bmesh.ops.triangulate(bm, faces=big, quad_method="BEAUTY", ngon_method="BEAUTY")

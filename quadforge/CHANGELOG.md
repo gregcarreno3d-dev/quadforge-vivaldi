@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: with symmetry, a large hole on the centre seam (several quads lost together, 14 or more open edges) is now closed with triangles instead of left open. A stress test that deletes 1 to 4 quads next to the seam failed in 25 of 150 cases before and in none now.
+- Tested on Blender 4.2.0, 4.5.15 LTS, 5.1.2 and 5.2 through the `bpy` module (all suites and the 67-case matrix pass); CI now runs the add-on on 4.2, 4.5 and 5.1.
+- The manifest declares the `files` permission (temporary files to run the bundled engine).
+- Four new engine hard cases (thin plate, long rod, finned sphere, hollow double-wall shell): 29 in total, all pass.
+
 ## 0.10.31
 
 - Repository clean-up for the public release: the root README, no personal name in the public docs, an up-to-date publishing note, and the GitHub Actions file now uses current runners (macOS Intel and Python 3.13 for the Blender tests).

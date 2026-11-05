@@ -130,6 +130,30 @@ def lumpy_dense():
     return T.mesh_from(d, h)
 
 
+def thin_plate():                    # closed slab, thickness 2 % of its width
+    co, t, _ = meshgen.box(24, (1.0, 1.0, 0.02))
+    return co, t
+
+
+def long_rod():                      # closed cylinder, length 12 x diameter
+    co, t, _ = meshgen.cylinder(0.1, 2.4, 32, 60, 4)
+    return co, t
+
+
+def finned_sphere():                 # sphere with four thin closed fins
+    parts = [sphere(4, 0.6)]
+    for ax in range(3):
+        size = [1.6, 1.6, 1.6]; size[ax] = 0.03
+        co, t, _ = meshgen.box(12, tuple(size))
+        parts.append((co, t))
+    return merge(parts)
+
+
+def two_wall_shell():                # two concentric spheres very close together (a hollow shell)
+    a = sphere(4, 1.0); b = sphere(4, 0.94)
+    return merge([a, (b[0], b[1][:, ::-1])])
+
+
 CASES = []
 
 
@@ -144,6 +168,10 @@ for nm, fn in (("open-cap", open_cap), ("open-tube", open_tube), ("open-disc", o
 add("three-balls", three_balls, 3000)
 add("three-balls", three_balls, 12000)
 add("nested-spheres", nested_spheres, 3000)
+add("thin-plate", thin_plate, 3000, open_ok=True, min_quad=0.9, count_tol=0.15)
+add("long-rod", long_rod, 3000, open_ok=True, min_quad=0.9, count_tol=0.15)
+add("finned-sphere", finned_sphere, 4000, open_ok=True, min_quad=0.9, count_tol=0.15)
+add("two-wall-shell", two_wall_shell, 4000, open_ok=True, min_quad=0.9, count_tol=0.15)
 add("dirty-sphere", dirty, 3000, open_ok=True)
 add("fin-nonmanifold", fin_nonmanifold, 3000, open_ok=True)
 add("sphere x0.001 (mm->m)", lambda: sphere(5), 4000, scale=0.001)

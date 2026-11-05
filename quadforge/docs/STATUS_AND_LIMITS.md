@@ -75,7 +75,8 @@ Reading: FORGE triangles are close to equilateral and follow the surface about t
 Open borders: the engine closes every border loop with a cap, treats the loop as a hard-edge line, runs the integer-grid method and removes the quads on the cap. Loops shorter than about 6 quad edges are left closed (the hole disappears). The border may get a few triangles where very short edges were welded.
 
 ## Not tested
-- Blender 4.2 to 5.1 (only 5.2.2 is available for automated tests); Windows and macOS on real machines.
+- Windows and macOS on real machines. Blender 4.2.0, 4.5.15 LTS, 5.1.2 and 5.2 were tested on Linux through the `bpy` module (integration, zones, guides, UV, surface, hard-edge suites and the 67-case matrix all pass); the Blender GUI itself was only used on 5.2.
+- Test note: the `bpy` module can crash or hang at interpreter shutdown on 4.2 and 4.5 (a Blender issue, not the add-on's), so tests run through `quadforge/tests/run_in_bpy.py`, which exits with `os._exit`.
 
 ## Limitations
 - Cells thinner than the quad size (very thin legs, antennae) can come out ragged or open.
