@@ -3,7 +3,7 @@
 ## 0.11.0 - 2026-11-05
 
 New
-- **Quick Preview** button: a small copy (about 3,000 faces, 1 to 3 seconds) made with your current settings, to check the flow before the full run. Your original is not touched; the preview is replaced by the next one and deleted when you run the full Remesh.
+- **Quick Preview** button: a small copy (about 3,000 faces, a few seconds; about 6 s for a 248,000-face head) made with your current settings, to check the flow before the full run. Your original is not touched; the preview is replaced by the next one and deleted when you run the full Remesh.
 - **Detail by Zone**: after *Refresh Zones*, give each zone (material, Face Set, mask or vertex group) its own detail level. The engine keeps a clean quad flow, so a factor of 2 gives roughly 1.7 times more faces in the zone, blended over about eight cells at the border.
 - **Subdivision Match** (Advanced, off by default): moves the vertices of a quad result so that, once Subdivision Surface is added, the smooth surface lands on the original instead of shrinking inside it (test: error after two levels 0.084 % to 0.002 % of the model size). Symmetry stays exact; creases stay put.
 
@@ -12,7 +12,7 @@ Engine
 - A density gradient is no longer dropped when the model already sits near the fit limit because of its many constrained borders (zones, creases).
 
 Fixed
-- Flat-shaded imports (FBX, OBJ smoothing groups) mark almost every edge sharp. When more than 25 % of the edges are already marked sharp and the sharp angle is on, those marks are now ignored (with a warning) and the angle decides. Three hard-surface cylinder FBX files went from 15,664 / 35,129 faces for a 5,000 target (55 s) to 5,120 / 5,150 (1 to 3 s).
+- Flat-shaded imports (FBX, OBJ smoothing groups) mark almost every edge sharp. When more than 25 % of the edges are already marked sharp and the sharp angle is on, those marks are now ignored (with a warning) and the angle decides. Three hard-surface cylinder FBX files went from 15,664 / 35,129 faces for a 5,000 target (55 s) to 5,120 / 5,150 (1 to 3 s in the add-on test).
 - Centre symmetry line (Quick Preview and full run): the seam no longer keeps zero-area folded faces, stray wire edges or loose vertices, and the valence-2 / valence-6 vertex pairs that the half-mesh border left on the line are merged into 3 / 5 (on a real head: 2 of 6 seam poles gone, 0 broken edges). The cleanup runs on a trial copy first and is applied only if the surface does not get more open or non-manifold, so hard-surface results are unchanged (all suites and the 67-case matrix pass).
 - With symmetry, a large hole on the centre seam (several quads lost together, 14 or more open edges) is closed with triangles instead of left open. A stress test that deletes 1 to 4 quads next to the seam failed in 25 of 150 cases before and in none now.
 
