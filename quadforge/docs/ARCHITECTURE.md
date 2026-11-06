@@ -1,4 +1,4 @@
-# Architecture — QuadForge Vivaldi 0.11.0
+# Architecture — QuadForge Vivaldi 0.11.1
 
 Technical document for developers and AIs. Everything described exists in this package.
 

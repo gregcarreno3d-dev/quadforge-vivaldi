@@ -794,6 +794,12 @@ def _remove_degenerate_geometry(bm) -> int:
         removed = len(broken)
         if broken:
             bmesh.ops.delete(bm, geom=broken, context="FACES_ONLY")
+    low = [min(vert.co[k] for vert in bm.verts) for k in range(3)]
+    high = [max(vert.co[k] for vert in bm.verts) for k in range(3)]
+    reach = 1e-6 * sum((high[k] - low[k]) ** 2 for k in range(3)) ** 0.5
+    zero = list({vert for edge in bm.edges if edge.calc_length() <= reach for vert in edge.verts})
+    if zero:                     # a quad with two corners on the same spot is a triangle in disguise
+        bmesh.ops.remove_doubles(bm, verts=zero, dist=reach)
     wires = [edge for edge in bm.edges if not edge.link_faces]
     if wires:
         bmesh.ops.delete(bm, geom=wires, context="EDGES")
@@ -801,6 +807,17 @@ def _remove_degenerate_geometry(bm) -> int:
     if loose:
         bmesh.ops.delete(bm, geom=loose, context="VERTS")
     return removed
+
+
+def _quad_min_corner_sine(points) -> float:
+    """Smallest sine of the four corner angles of a quad (1 = square, 0 = flat or folded)."""
+    worst = 1.0
+    for k in range(4):
+        a = points[(k - 1) % 4] - points[k]
+        b = points[(k + 1) % 4] - points[k]
+        denominator = a.length * b.length
+        worst = min(worst, a.cross(b).length / denominator if denominator > 1e-30 else 0.0)
+    return worst
 
 
 def _dissolve_seam_corners(bm, plan: sym.SymmetryPlan) -> int:
@@ -841,6 +858,8 @@ def _dissolve_seam_corners(bm, plan: sym.SymmetryPlan) -> int:
         if {loop_b[1], loop_b[3]} != {loop_a[1], loop_a[3]}:
             continue
         merged = [loop_a[1], loop_a[2], loop_a[3], loop_b[2]]
+        if _quad_min_corner_sine([vertex.co for vertex in merged]) < 0.12:
+            continue                    # the diamond would be a flattened, folded quad: leave the pair as it is
         try:
             face = bm.faces.new(merged)
         except ValueError:

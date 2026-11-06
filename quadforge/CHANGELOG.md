@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.1 - 2026-11-06
+
+Fixed
+- Seam corners on the centre symmetry line are only merged when the resulting quad stays well shaped, so flattened diamonds no longer appear on thin or flat regions. Quads with two corners on the same spot (a triangle in disguise) are welded into a triangle. The cleanup still runs on a trial copy and is skipped if the surface would get less closed.
+- Flat-shaded imports (FBX, OBJ smoothing groups) no longer turn almost every edge into a hard edge (see 0.11.0 notes below; included in the published 0.11.0 release build).
+- Test scripts no longer depend on an absolute path, so the per-Blender-version CI jobs run.
+
+Tooling
+- Tags `v*` now build the four engines, package the zips and publish the GitHub release automatically.
+
 ## 0.11.0 - 2026-11-05
 
 New
