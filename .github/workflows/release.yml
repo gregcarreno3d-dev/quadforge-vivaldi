@@ -1,0 +1,108 @@
+name: Release
+
+# Push a tag such as v0.11.0 (or run the workflow by hand) and this builds the engine on all four platforms,
+# packages the zips and publishes the GitHub release with them attached.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.11.0); it is created on the current commit if it does not exist"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  engine:
+    name: Engine ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: linux,       os: ubuntu-latest,  exe: forge }
+          - { name: windows,     os: windows-latest, exe: forge.exe }
+          - { name: macos-arm64, os: macos-14,       exe: forge }
+          - { name: macos-x64,   os: macos-15-intel, exe: forge }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install ziglang numpy scikit-image
+      - run: python tools/build.py ${{ matrix.name }}
+      - name: Engine hard cases (29 models)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t08_hard_cases.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.name }}
+          path: engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+
+  release:
+    name: Package and publish
+    needs: engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/download-artifact@v4
+        with: { path: engines }
+      - name: Place the engines
+        run: |
+          for name in linux macos-arm64 macos-x64; do
+            mkdir -p quadforge/bin/$name
+            cp engines/forge-$name/forge quadforge/bin/$name/forge
+            chmod +x quadforge/bin/$name/forge
+          done
+          mkdir -p quadforge/bin/windows
+          cp engines/forge-windows/forge.exe quadforge/bin/windows/forge.exe
+      - name: Package
+        run: |
+          find . -name __pycache__ -prune -exec rm -rf {} +
+          rm -rf quadforge/devtools/engine_tests/out
+          python tools/package.py
+          ls -la dist
+      - name: Check the tag matches the manifest version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION=$(python - <<'PY'
+          import re
+          print(re.search(r'^version\s*=\s*"([^"]+)"', open("quadforge/blender_manifest.toml").read(), re.M).group(1))
+          PY
+          )
+          echo "tag=$TAG manifest=$VERSION"
+          test "v$VERSION" = "$TAG" || { echo "Tag $TAG does not match manifest version $VERSION"; exit 1; }
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Release notes from the changelog
+        run: |
+          python - <<'PY'
+          import os, re
+          text = open("quadforge/CHANGELOG.md", encoding="utf-8").read()
+          version = os.environ["VERSION"]
+          m = re.search(r"^## " + re.escape(version) + r".*?\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+          body = m.group(1).strip() if m else ""
+          intro = (f"QuadForge Vivaldi {version}\n\n")
+          install = ("\n\nInstall: Edit > Preferences > Get Extensions > Install from Disk, and choose the zip for your system: "
+                     f"quadforge-vivaldi-{version}-windows-x64.zip, -linux-x64.zip, -macos-arm64.zip (Apple Silicon), "
+                     "-macos-x64.zip (Intel Mac). The -all-platforms zip works on any of them.\n\n"
+                     "Status: validated on Linux. The Windows and macOS engines are built and pass the engine hard cases on "
+                     "their own runners, but have had little real-world testing; please open an issue if something fails.\n")
+          open("notes.md", "w", encoding="utf-8").write(intro + body + install)
+          PY
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/*.zip --title "QuadForge Vivaldi $VERSION" --notes-file notes.md \
+              --target "${{ github.sha }}"
+          fi
