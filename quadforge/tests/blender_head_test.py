@@ -115,7 +115,7 @@ for target in (2000, 8000, 30000):
         st = r.levels[0].stats
         frac, n = follows(r.object.data, polylines)
         error = abs(st["faces"] - target) / target
-        sys.path.insert(0, "/home/claude/quadforge-vivaldi/tools")
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))
         import quality_metrics as qm
         from quadforge.core import mesh_io as mio
         arrays = mio.read_mesh_arrays(r.object.data)

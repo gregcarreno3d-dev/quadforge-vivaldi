@@ -15,7 +15,7 @@ jobs:
         include:
           - { name: linux,       os: ubuntu-latest,  exe: forge }
           - { name: windows,     os: windows-latest, exe: forge.exe }
-          - { name: macos-arm64, os: macos-14,       exe: forge }
+          - { name: macos-arm64, os: macos-latest,   exe: forge }
           - { name: macos-x64,   os: macos-15-intel,      exe: forge }
     steps:
       - uses: actions/checkout@v4
