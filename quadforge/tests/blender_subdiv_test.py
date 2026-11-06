@@ -63,7 +63,7 @@ def subdivided_deviation(res, source):
 
 
 def min_jacobian(res):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    sys.path.insert(0, "/home/claude/quadforge-vivaldi/tools")
     import quality_metrics as qm
     from quadforge.core import mesh_io as mio
     a = mio.read_mesh_arrays(res.data)

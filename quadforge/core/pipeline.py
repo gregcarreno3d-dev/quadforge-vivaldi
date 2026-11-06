@@ -740,6 +740,109 @@ def _fill_small_loops(bm, boundary_edges: list, max_sides: int = 12) -> list:
     return created
 
 
+def _surface_defects(bm) -> int:
+    """Open plus non-manifold edges: the number a cleanup must never raise."""
+    return sum(1 for edge in bm.edges if len(edge.link_faces) != 2)
+
+
+def _tidy_seam(bm, plan: sym.SymmetryPlan, settings) -> None:
+    """Degenerate-geometry cleanup and seam-corner merge, applied only when a trial run on a copy leaves the surface
+    no more open or non-manifold than before (hard-surface and open meshes must never get worse)."""
+    def _run(target) -> None:
+        _remove_degenerate_geometry(target)
+        if plan.is_active and settings.output == "QUADS":
+            for _ in range(3):      # a corner next to another one is left for the next round
+                if not _dissolve_seam_corners(target, plan):
+                    break
+
+    trial = bm.copy()
+    try:
+        _run(trial)
+        better = _surface_defects(trial) <= _surface_defects(bm)
+    finally:
+        trial.free()
+    if better:
+        _run(bm)
+
+
+def _remove_degenerate_geometry(bm) -> int:
+    """Zero-area faces (a quad folded onto a line, two of its corners being separate vertices at the same spot), stray
+    wire edges and loose vertices. Merging the twin vertices lets the faces on both sides of the fold share their edge,
+    so removing the folded face leaves a closed surface. Returns how many faces were removed."""
+    if not bm.faces:
+        return 0
+    areas = [face.calc_area() for face in bm.faces]
+    typical = float(sum(areas)) / len(areas)
+    flat = [face for face, area in zip(bm.faces, areas) if area <= 1e-7 * typical]
+    removed = 0
+    if flat:
+        twins = list({vert for face in flat for vert in face.verts})
+        low = [min(vert.co[k] for vert in bm.verts) for k in range(3)]
+        high = [max(vert.co[k] for vert in bm.verts) for k in range(3)]
+        diagonal = sum((high[k] - low[k]) ** 2 for k in range(3)) ** 0.5
+        bmesh.ops.remove_doubles(bm, verts=twins, dist=1e-6 * diagonal)
+        broken = [face for face in bm.faces if face.is_valid and (
+            len({vert.index for vert in face.verts}) < len(face.verts) or face.calc_area() <= 1e-7 * typical)]
+        removed = len(broken)
+        if broken:
+            bmesh.ops.delete(bm, geom=broken, context="FACES_ONLY")
+    wires = [edge for edge in bm.edges if not edge.link_faces]
+    if wires:
+        bmesh.ops.delete(bm, geom=wires, context="EDGES")
+    loose = [vert for vert in bm.verts if not vert.link_edges]
+    if loose:
+        bmesh.ops.delete(bm, geom=loose, context="VERTS")
+    return removed
+
+
+def _dissolve_seam_corners(bm, plan: sym.SymmetryPlan) -> int:
+    """A vertex on the symmetry plane whose only edges lie in the plane has valence 2: the two quads around it (a mirror
+    pair) share both of its edges and each has a flat 180 degree corner there. It is the half mesh's boundary corner,
+    a defect the symmetric field leaves, always next to a valence-6 vertex. Dissolving the vertex merges the pair into one
+    well-shaped quad that straddles the plane (a diamond), turning the 2 and 6 into a 3 and a 5. Returns how many."""
+    def _on_plane(vert) -> bool:
+        return any(abs(vert.co[axis] - plan.plane_offsets[axis]) <= 3.0 * plan.tolerance + 1e-9 for axis in plan.axes)
+
+    corners = []
+    for vert in bm.verts:
+        if len(vert.link_edges) != 2 or len(vert.link_faces) != 2 or not _on_plane(vert):
+            continue
+        first, second = vert.link_faces
+        if len(first.verts) != 4 or len(second.verts) != 4:
+            continue
+        if len(set(first.verts) | set(second.verts)) != 5:
+            continue                    # the pair must share exactly the corner's two edges
+        corners.append(vert)
+    # two corners next to each other would merge into a 6-gon: keep one of each such pair
+    chosen, taken = [], set()
+    for vert in corners:
+        faces = set(vert.link_faces)
+        if faces & taken:
+            continue
+        taken |= faces
+        chosen.append(vert)
+    merged_count = 0
+    for vert in chosen:
+        first, second = vert.link_faces
+        loop_a = [vertex for vertex in first.verts]
+        shift = loop_a.index(vert)
+        loop_a = loop_a[shift:] + loop_a[:shift]          # [corner, next, opposite, previous]
+        loop_b = [vertex for vertex in second.verts]
+        shift = loop_b.index(vert)
+        loop_b = loop_b[shift:] + loop_b[:shift]
+        if {loop_b[1], loop_b[3]} != {loop_a[1], loop_a[3]}:
+            continue
+        merged = [loop_a[1], loop_a[2], loop_a[3], loop_b[2]]
+        try:
+            face = bm.faces.new(merged)
+        except ValueError:
+            continue
+        face.copy_from(first)
+        bmesh.ops.delete(bm, geom=[vert], context="VERTS")    # takes the corner, its two edges and the two old faces
+        merged_count += 1
+    return merged_count
+
+
 def _mirror_halves_into_final_mesh(half_mesh, plan: sym.SymmetryPlan, input_was_closed: bool,
                                    original, mesh_name: str, settings: RemeshSettings) -> bpy.types.Mesh:
     bm = bmesh.new()
@@ -779,6 +882,7 @@ def _mirror_halves_into_final_mesh(half_mesh, plan: sym.SymmetryPlan, input_was_
                     big = [face for face in filled if face.is_valid and len(face.verts) > 4]
                     if big:  # keep the result quads and triangles only
                         bmesh.ops.triangulate(bm, faces=big, quad_method="BEAUTY", ngon_method="BEAUTY")
+        _tidy_seam(bm, plan, settings)
         if plan.is_active and input_was_closed and all(not edge.is_boundary for edge in bm.edges):
             bmesh.ops.recalc_face_normals(bm, faces=bm.faces)  # mirroring can flip normals
 

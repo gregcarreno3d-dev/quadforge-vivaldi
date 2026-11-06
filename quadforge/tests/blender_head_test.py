@@ -115,16 +115,24 @@ for target in (2000, 8000, 30000):
         st = r.levels[0].stats
         frac, n = follows(r.object.data, polylines)
         error = abs(st["faces"] - target) / target
-        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))
+        sys.path.insert(0, "/home/claude/quadforge-vivaldi/tools")
         import quality_metrics as qm
         from quadforge.core import mesh_io as mio
         arrays = mio.read_mesh_arrays(r.object.data)
         jac, _ = qm.scaled_jacobian(arrays.co, np.diff(arrays.poly_offsets), arrays.loop_verts)
         p1 = float(np.percentile(jac, 1))
-        good = (st["border_edges"] == 0 and st["non_manifold_edges"] == 0 and st["quads"] == st["faces"]
+        import bmesh as _bmesh
+        _bm = _bmesh.new(); _bm.from_mesh(r.object.data)
+        wire = sum(1 for e in _bm.edges if not e.link_faces)
+        loose = sum(1 for v in _bm.verts if not v.link_edges)
+        flat = sum(1 for f in _bm.faces if f.calc_area() <= 1e-7 * max(1e-30, sum(x.calc_area() for x in _bm.faces) / len(_bm.faces)))
+        seam = [v for v in _bm.verts if abs(v.co.x) < 1e-5]
+        corners = sum(1 for v in seam if len(v.link_edges) == 2)
+        _bm.free()
+        good = (wire == 0 and loose == 0 and flat == 0 and corners == 0 and st["border_edges"] == 0 and st["non_manifold_edges"] == 0 and st["quads"] == st["faces"]
                 and error < 0.12 and p1 > 0.3 and float(jac.mean()) > 0.9)
         print(("PASS" if good else "FAIL"),
-              f"head {target:>5} guides {'on ' if guides else 'off'}: faces {st['faces']} ({100 * error:.1f}% off), "
+              f"[wire {wire} loose {loose} flat {flat} seam-corners {corners}] head {target:>5} guides {'on ' if guides else 'off'}: faces {st['faces']} ({100 * error:.1f}% off), "
               f"Jacobian mean {jac.mean():.3f} p1 {p1:.2f}, rows along the loops {100 * frac:.0f}% ({n} edges)")
         ok &= good
 print("ALL PASSED" if ok else "FAILED")

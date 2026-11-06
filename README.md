@@ -4,6 +4,10 @@ A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its
 
 ![Examples: an organic head at 20K quads, a hard-surface flange at 5K quads with creases kept, and the same flange without hard-edge detection](docs/images/examples.png)
 
+![Results with version 0.11: head, fairy, ant, plate and cylinder, with face counts, poles and hard edges, measured in Blender 5.2.3](docs/images/results_0.11.jpg)
+
+Figures in the image come from runs in Blender 5.2.3 on the author's machine; times depend on the computer.
+
 - Quads or triangles, from 2K to 500K faces, with a one-click **Hard Surface** / **Soft Surface (Organic)** setup
 - Reads heavy sculpts directly, keeps hard edges, symmetry, UV maps, Face Sets and materials
 - Isolate zones by material, Face Set, mask or vertex group

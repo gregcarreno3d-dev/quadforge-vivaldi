@@ -12,6 +12,7 @@ Engine
 - A density gradient is no longer dropped when the model already sits near the fit limit because of its many constrained borders (zones, creases).
 
 Fixed
+- Centre symmetry line (Quick Preview and full run): the seam no longer keeps zero-area folded faces, stray wire edges or loose vertices, and the valence-2 / valence-6 vertex pairs that the half-mesh border left on the line are merged into 3 / 5 (on a real head: 2 of 6 seam poles gone, 0 broken edges). The cleanup runs on a trial copy first and is applied only if the surface does not get more open or non-manifold, so hard-surface results are unchanged (all suites and the 67-case matrix pass).
 - With symmetry, a large hole on the centre seam (several quads lost together, 14 or more open edges) is closed with triangles instead of left open. A stress test that deletes 1 to 4 quads next to the seam failed in 25 of 150 cases before and in none now.
 
 Testing
