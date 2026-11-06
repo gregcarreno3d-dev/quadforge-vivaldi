@@ -571,7 +571,15 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
         guide_lines = int(planes.sum())
         hard |= planes
     if settings.use_existing_sharp:
-        hard |= mio.read_edge_flag(mesh, "use_edge_sharp")
+        marked = mio.read_edge_flag(mesh, "use_edge_sharp")
+        if arrays.n_edges and settings.use_sharp_angle and marked.sum() > MAX_HARD_EDGE_FRACTION * arrays.n_edges:
+            # flat-shaded imports (FBX, OBJ smoothing groups) mark nearly every edge sharp: that is shading, not creases
+            message = (f"{marked.sum() / arrays.n_edges:.0%} of the edges were already marked sharp (typical of a "
+                       f"flat-shaded import), so those marks were ignored and the sharp angle decided instead.")
+            if message not in warnings:
+                warnings.append(message)
+        else:
+            hard |= marked
     if settings.use_seams:
         hard |= mio.read_edge_flag(mesh, "use_seam")
 
