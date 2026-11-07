@@ -205,6 +205,7 @@ SPANISH_INTERFACE = {
     "Flat": "Plano",
     "Angle": "Ángulo",
     "Edges Marked Sharp": "Bordes marcados como sharp",
+    "Rounded Bevels": "Biseles redondeados",
     "UV Seams": "Costuras UV",
     "Keep Open Borders": "Conservar bordes abiertos",
     "By Material": "Por material",
@@ -280,6 +281,8 @@ SPANISH_INTERFACE = {
         "Se conservan las aristas donde la superficie se dobla más que este ángulo. Menor conserva más, mayor conserva menos",
     "Also keep the edges you already marked as sharp in Blender":
         "Conserva también las aristas que ya marcaste como sharp en Blender",
+    "Keep the profile of rounded bevels and thin chamfer strips: the quad rows follow both sides of them and the faces get smaller there. Turn off if a smooth surface gets too many small faces":
+        "Conserva el perfil de los biseles redondeados y las franjas finas de chaflán: las filas de quads siguen ambos lados y las caras se hacen más pequeñas ahí. Desactívalo si una superficie suave recibe demasiadas caras pequeñas",
     "Also keep UV seams as hard edges": "Conserva también las costuras UV como bordes duros",
     "Keep the outline of open meshes (holes and cut edges)":
         "Conserva el contorno de las mallas abiertas (agujeros y bordes cortados)",

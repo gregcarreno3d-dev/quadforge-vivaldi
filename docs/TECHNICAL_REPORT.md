@@ -1,6 +1,6 @@
 # FORGE: field-aligned integer-grid quad remeshing inside Blender
 
-**Technical report for QuadForge Vivaldi 0.11.1** · GPL-3.0-or-later · November 2026
+**Technical report for QuadForge Vivaldi 0.12.0** · GPL-3.0-or-later · November 2026
 
 > **What this document is.** A description of how the QuadForge add-on and its FORGE engine turn an arbitrary triangle or
 > polygon mesh into a clean quad mesh. It is a **technical report, not a peer-reviewed paper**. FORGE does not claim a new

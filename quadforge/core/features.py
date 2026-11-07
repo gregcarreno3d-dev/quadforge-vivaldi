@@ -104,3 +104,116 @@ def feature_segments(m: geo.MeshArrays, edge_mask: np.ndarray):
     marked = m.edges[np.asarray(edge_mask, dtype=bool)]
     co = m.co.astype(np.float64, copy=False)
     return co[marked[:, 0]], co[marked[:, 1]]
+
+
+# --------------------------------------------------------------------------
+# Soft bevels: rounded edges made of several facets that are each below the sharp angle
+# --------------------------------------------------------------------------
+
+SOFT_FACET_ANGLE_DEGREES = 4.0      # a dihedral above this separates two facets of a bevel; below it faces are one flat patch
+SOFT_BAND_NARROW = 1.0              # patches narrower than this many quad lengths are facets of a bevel band
+SOFT_BAND_MIN_WIDTH = 1.2           # a band must be at least this many quad lengths wide to carry two edge loops
+SOFT_BAND_MAX_TURN = 150.0          # degrees: a band turning the surface right back on itself is a closed curved surface
+SOFT_BAND_MAX_WIDTH = 5.0           # wider than this many quad lengths it is a curved surface, not a bevel (a sphere is one big band)
+SOFT_MIN_CHAIN_QUADS = 3.0          # boundary chains shorter than this many quad lengths are noise
+
+
+def detect_soft_bevels(m: geo.MeshArrays, angle_deg: float, quad_length: float, *,
+                       normals: np.ndarray | None = None, areas: np.ndarray | None = None,
+                       band_vertices: bool = False):
+    """Edges that bound a soft bevel (a fillet or rounded chamfer whose facets are each flatter than ``angle_deg``).
+
+    A fillet of four facets turning 90 degrees shows no single edge above the sharp angle, so the normal detector
+    sees nothing and the remesh lets quads cut across it. Here the faces are grouped into flat patches (faces joined
+    by dihedrals under a few degrees). The facets of a bevel are narrow patches chained together between two wide
+    patches; when those two wide patches differ by at least ``angle_deg`` the band is a bevel, and the edges between
+    the band and the wide patches are returned, so the quad rows run along both sides of it. Bands that are too
+    narrow for two edge loops at this quad size are left alone. Returns an (E,) bool mask; with ``band_vertices`` a
+    tuple ``(mask, (V,) bool mask of the vertices lying on the kept bands)``.
+    """
+    mask = np.zeros(m.n_edges, dtype=bool)
+    nothing = (mask, np.zeros(m.n_verts, dtype=bool)) if band_vertices else mask
+    if m.n_polys == 0 or quad_length <= 0.0:
+        return nothing
+    if normals is None or areas is None:
+        normals, areas = geo.polygon_normals_areas(m)
+    first, second, counts = geo.edge_face_pairs(m)
+    angles = edge_angles(m, normals)
+    interior = counts == 2
+    flat = interior & (angles <= SOFT_FACET_ANGLE_DEGREES)
+    soft = interior & (angles > SOFT_FACET_ANGLE_DEGREES) & (angles <= angle_deg)
+    if not soft.any():
+        return nothing
+
+    patch = geo.connected_labels(m.n_polys, first[flat], second[flat])
+    _, patch = np.unique(patch, return_inverse=True)
+    patch = patch.reshape(-1)
+    n_patch = int(patch.max()) + 1
+    lengths = geo.edge_lengths(m)
+    patch_area = np.bincount(patch, weights=areas, minlength=n_patch)
+    # perimeter of a patch: every edge that is not interior to it (borders, hard and soft edges)
+    inside = np.zeros(m.n_edges, dtype=bool)
+    inside[interior] = patch[first[interior]] == patch[second[interior]]
+    outer = np.flatnonzero(~inside & (counts >= 1))
+    perimeter = np.bincount(patch[first[outer]], weights=lengths[outer], minlength=n_patch)
+    two_sided = outer[counts[outer] == 2]
+    perimeter += np.bincount(patch[second[two_sided]], weights=lengths[two_sided], minlength=n_patch)
+    width = 2.0 * patch_area / np.maximum(perimeter, 1e-30)
+    narrow = width < SOFT_BAND_NARROW * quad_length
+
+    soft_edges = np.flatnonzero(soft)
+    pa, pb = patch[first[soft_edges]], patch[second[soft_edges]]
+    both_narrow = narrow[pa] & narrow[pb]
+    band_of_patch = geo.connected_labels(n_patch, pa[both_narrow], pb[both_narrow])
+    # boundary edges: soft edges between a narrow patch and a wide one
+    edge_narrow_side = narrow[pa] != narrow[pb]
+    boundary = soft_edges[edge_narrow_side]
+    if boundary.size == 0:
+        return nothing
+    narrow_patch = np.where(narrow[pa[edge_narrow_side]], pa[edge_narrow_side], pb[edge_narrow_side])
+    wide_patch = np.where(narrow[pa[edge_narrow_side]], pb[edge_narrow_side], pa[edge_narrow_side])
+    band = band_of_patch[narrow_patch]
+
+    patch_normal = np.zeros((n_patch, 3))
+    np.add.at(patch_normal, patch, normals * areas[:, None])
+    patch_normal /= np.maximum(np.linalg.norm(patch_normal, axis=1), 1e-30)[:, None]
+
+    keep_band = {}
+    for band_id in np.unique(band):
+        select = band == band_id
+        wides = np.unique(wide_patch[select])
+        if wides.size < 2:
+            continue
+        cosine = patch_normal[wides] @ patch_normal[wides].T
+        turn = np.degrees(np.arccos(np.clip(cosine.min(), -1.0, 1.0)))
+        if turn < angle_deg or turn > SOFT_BAND_MAX_TURN:
+            continue
+        band_patches = np.flatnonzero(narrow & (band_of_patch == band_id))
+        band_area = patch_area[band_patches].sum()
+        boundary_length = lengths[boundary[select]].sum()
+        band_width = 2.0 * band_area / max(boundary_length, 1e-30)
+        if band_width < SOFT_BAND_MIN_WIDTH * quad_length or band_width > SOFT_BAND_MAX_WIDTH * quad_length:
+            continue
+        keep_band[band_id] = True
+    if not keep_band:
+        return nothing
+    chosen = boundary[np.isin(band, list(keep_band))]
+    # drop short, isolated pieces
+    labels = geo.connected_labels(m.n_verts, m.edges[chosen, 0], m.edges[chosen, 1])
+    _, chain = np.unique(labels[m.edges[chosen, 0]], return_inverse=True)
+    chain = chain.reshape(-1)
+    chain_length = np.bincount(chain, weights=lengths[chosen])
+    chosen = chosen[chain_length[chain] >= SOFT_MIN_CHAIN_QUADS * quad_length]
+    mask[chosen] = True
+    if not band_vertices:
+        return mask
+    if not chosen.size:
+        return nothing
+    survivors = np.zeros(m.n_edges, dtype=bool)
+    survivors[chosen] = True
+    kept_bands = np.unique(band[survivors[boundary]])         # only bands that still have a kept border
+    band_patch_ids = np.flatnonzero(narrow & np.isin(band_of_patch, kept_bands))
+    face_in_band = np.isin(patch, band_patch_ids)
+    on_band = np.zeros(m.n_verts, dtype=bool)
+    on_band[m.loop_verts[face_in_band[m.loop_poly]]] = True
+    return mask, on_band

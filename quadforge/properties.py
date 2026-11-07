@@ -183,6 +183,12 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         description="Also keep the edges you already marked as sharp in Blender",
         default=True,
     )
+    soft_bevels: BoolProperty(
+        name="Rounded Bevels",
+        description="Keep the profile of rounded bevels and thin chamfer strips: the quad rows follow both sides of them "
+                    "and the faces get smaller there. Turn off if a smooth surface gets too many small faces",
+        default=True,
+    )
     use_seams: BoolProperty(
         name="UV Seams",
         description="Also keep UV seams as hard edges",
@@ -358,6 +364,7 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
             use_sharp_angle=self.use_sharp_angle,
             sharp_angle_deg=math.degrees(self.sharp_angle),
             use_existing_sharp=self.use_existing_sharp,
+            soft_bevels=self.soft_bevels,
             use_seams=self.use_seams,
             smart_features=self.smart_features,
             min_feature_size=self.min_feature_size,

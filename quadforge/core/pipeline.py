@@ -64,6 +64,9 @@ DUPLICATE_VERTEX_DISTANCE = 1e-6          # relative to the model size; merges d
 MIN_SYMMETRY_TOLERANCE = 1e-7             # relative to the model size
 MIN_FACES_PER_PIECE = 8                   # never ask the engine for fewer quads than this
 MAX_HARD_EDGE_FRACTION = 0.25             # warn if more than 25% of the edges are "hard"
+THIN_BAND_FLOOR = 0.75                   # strongest refinement of a thin strip between hard edges (finer breaks the engine's grid)
+THIN_BAND_MIN_LENGTH = 12.0              # only long strips (rims, chamfer rings, fillets) are refined
+THIN_BAND_REACH = 3.0                     # bands between hard edges narrower than this many quad lengths get finer faces
 TARGET_MISS_WARNING_FRACTION = 0.15       # warn if the quad count is 15% away from the target
 SYMMETRY_MATCH_WARNING_THRESHOLD = 0.9    # warn if fewer than 90% of sampled points match
 MIN_DECIMATE_RATIO = 0.001
@@ -106,6 +109,8 @@ class RemeshSettings:
     use_sharp_angle: bool = True
     sharp_angle_deg: float = 35.0
     use_existing_sharp: bool = True
+    soft_bevels: bool = True                 # keep the rows along rounded bevels made of shallow facets
+    soft_bevel_detail: float = 0.5           # edge length multiplier on the facets of rounded bevels (1 = no refinement)
     use_seams: bool = True
     smart_features: bool = True      # judge whole chains of sharp edges, not single edges
     min_feature_size: float = 2.0    # chains shorter than this many quad lengths are noise
@@ -544,6 +549,46 @@ class LevelConstraints:
     has_guides: bool = False        # symmetry guide lines were marked (the engine must align to them)
 
 
+def _refine_thin_bands(mesh, arrays, hard: np.ndarray, areas: np.ndarray, quad_length: float, band: np.ndarray,
+                       bevel_scale: float) -> int:
+    """Faces between hard edges that are narrower than a quad (a chamfer strip, the facets of a rounded bevel) cannot hold
+    a row of quads at the normal size: the rows zigzag across them. Give those faces a smaller target size, in
+    proportion to the band width (never below ``floor`` times the normal size); the engine blends it into the
+    surroundings. Returns how many vertices were refined."""
+    first, second, counts = geo.edge_face_pairs(arrays)
+    interior = (counts == 2) & ~hard
+    patch = geo.connected_labels(arrays.n_polys, first[interior], second[interior])
+    _, patch = np.unique(patch, return_inverse=True)
+    patch = patch.reshape(-1)
+    n_patch = int(patch.max()) + 1
+    lengths = geo.edge_lengths(arrays)
+    outer = np.flatnonzero(~interior & (counts >= 1))
+    perimeter = np.bincount(patch[first[outer]], weights=lengths[outer], minlength=n_patch)
+    two_sided = outer[counts[outer] == 2]
+    perimeter += np.bincount(patch[second[two_sided]], weights=lengths[two_sided], minlength=n_patch)
+    area = np.bincount(patch, weights=areas, minlength=n_patch)
+    width = 2.0 * area / np.maximum(perimeter, 1e-30)
+    reach = THIN_BAND_REACH
+    scale = np.clip(width / (reach * quad_length), THIN_BAND_FLOOR, 1.0)
+    length = perimeter / 2.0 - width
+    scale[length < THIN_BAND_MIN_LENGTH * quad_length] = 1.0          # short strips (gear teeth) are left alone
+    face_scale = scale[patch]
+    if not (face_scale < 1.0).any() and not band.any():
+        return 0
+    multiplier = np.ones(arrays.n_verts)
+    np.minimum.at(multiplier, arrays.loop_verts, face_scale[arrays.loop_poly])
+    multiplier[band] = np.minimum(multiplier[band], bevel_scale)      # the facets of a rounded bevel need more
+    current = mio.read_attribute(mesh, DENSITY_ATTRIBUTE, arrays.n_verts)
+    if current is not None:
+        multiplier = np.minimum(multiplier, np.asarray(current, dtype=np.float64))
+    attribute = mesh.attributes.get(DENSITY_ATTRIBUTE)
+    if attribute is not None:
+        mesh.attributes.remove(attribute)
+    attribute = mesh.attributes.new(name=DENSITY_ATTRIBUTE, type="FLOAT", domain="POINT")
+    attribute.data.foreach_set("value", multiplier.astype(np.float32))
+    return int((multiplier < 1.0).sum())
+
+
 def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: int,
                                warnings: list, plan: sym.SymmetryPlan = None) -> LevelConstraints:
     """Mark every edge the engine must keep as 'sharp'."""
@@ -552,6 +597,7 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
     quad_length = geo.quad_edge_length(float(areas.sum()), quads_for_piece)
     hard = np.zeros(arrays.n_edges, dtype=bool)
     geometric = np.zeros(arrays.n_edges, dtype=bool)      # creases of the shape itself (not zone borders)
+    soft_band = None
 
     if settings.use_sharp_angle:
         if settings.smart_features:
@@ -562,6 +608,11 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
             geometric |= found.mask
         else:
             geometric |= geo.detect_sharp_edges(arrays, settings.sharp_angle_deg, normals)
+    if settings.use_sharp_angle and settings.soft_bevels:
+        # fillets made of facets that are each below the angle: keep the quad rows along both sides of them
+        soft, soft_band = features.detect_soft_bevels(arrays, settings.sharp_angle_deg, quad_length, normals=normals,
+                                                 areas=areas, band_vertices=True)
+        geometric |= soft
     hard |= geometric
     guide_lines = 0
     planes = np.zeros(arrays.n_edges, dtype=bool)
@@ -594,6 +645,8 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
                    f"The angle is probably too low: raise it to keep the remesh clean.")
         if message not in warnings:
             warnings.append(message)
+    if settings.soft_bevels and settings.soft_bevel_detail < 1.0 and geometric.any() and soft_band is not None:
+        _refine_thin_bands(mesh, arrays, hard & ~planes, areas, quad_length, soft_band, settings.soft_bevel_detail)
     mio.write_edge_flag(mesh, "use_edge_sharp", hard)
     segments = features.feature_segments(arrays, geometric) if geometric.any() else None
     return LevelConstraints(hard_count_shown, quad_length, segments, guide_lines > 0)

@@ -1,4 +1,4 @@
-# FORGE engine (0.11.1)
+# FORGE engine (0.12.0)
 
 QuadForge's own remeshing engine. C++17 program with no dependencies, built for Windows, Linux and macOS (arm64 and x64) with Zig. Source is in `engine_src/` (`python engine_src/build.py` rebuilds it; needs `pip install ziglang`).
 

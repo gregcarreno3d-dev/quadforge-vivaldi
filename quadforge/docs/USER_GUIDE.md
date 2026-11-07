@@ -1,4 +1,4 @@
-# User guide — QuadForge Vivaldi 0.11.1
+# User guide — QuadForge Vivaldi 0.12.0
 
 ## 1. Basic flow (3 steps)
 1. Select the mesh (triangles or quads, any density). The add-on switches to Object Mode by itself.
@@ -18,7 +18,7 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 
 ## 3. Optional panels
 - **Flow Guides:** tell the engine where you want the rows of quads to run. In Edit Mode, select edges on your model (for example a loop around an eye or the mouth) and press *Mark Flow Guide*; remesh as usual. It is a soft hint, so it follows your lines where the surface allows it. The minus button unmarks the selected edges, *Clear Flow Guides* removes all of them, and the checkbox in the panel header turns them off without deleting them. With symmetry on the guides are mirrored. FORGE quads only.
-- **Hard Edges:** keeps marked corners as clean edge chains. Lower *Angle* = more edges. *Smart Detection* ignores noise smaller than two quads and keeps right angles. Sharp edges and UV seams can also be respected. *Keep Open Borders* keeps outlines of open meshes.
+- **Hard Edges:** keeps marked corners as clean edge chains. Lower *Angle* = more edges. *Smart Detection* ignores noise smaller than two quads and keeps right angles. Sharp edges and UV seams can also be respected. *Rounded Bevels* also keeps fillets made of several soft facets (each below the angle) and refines them; turn it off if a smooth organic surface gets unwanted edge rows. *Keep Open Borders* keeps outlines of open meshes.
 - **Isolate Zones:** separates by material, Face Set, sculpt mask or vertex group (paint areas in different groups, like ZBrush polygroups) with clean loops.
 - **Symmetry:** local X/Y/Z axes. One half is remeshed, then mirrored and welded. Check *Plane At* if the origin is not centred.
 - **Extra Levels:** `15K, 10K, 5K, 4K` builds several levels in one run (with FORGE each comes from the source; with QuadriFlow, from the previous one).

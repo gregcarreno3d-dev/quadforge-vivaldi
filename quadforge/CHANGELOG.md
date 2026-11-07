@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0 - 2026-11-07
+
+New
+- **Rounded Bevels** (Detection, on by default): fillets built from several soft facets (each below the sharp angle, together turning the surface by more than it) are now recognised as bevels. Their two borders are kept as quad rows, and the facets get a finer target size so the rounded profile survives the remesh. Found with a spool/pulley model whose soft bevels with hard chamfers were flattened (deviation p99 0.106 % of the model size at 20,000 quads).
+- Thin strips between hard edges (chamfers narrower than about three quads, longer than twelve) get a smaller target size, so their quad rows no longer zigzag.
+
+Fixed
+- Smooth surfaces (ellipsoids, heads) are never taken for bevels: a band must turn the surface by 150 degrees or less and be at most five quads wide.
+
 ## 0.11.1 - 2026-11-06
 
 Fixed

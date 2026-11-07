@@ -228,6 +228,7 @@ class QUADFORGE_PT_hard_edges(_QuadForgePanel, bpy.types.Panel):
         smart.prop(settings, "keep_right_angles")
         draw_wrapped_text(detection, context, translate(texts.HELP_SMART_FEATURES))
         detection.prop(settings, "snap_features")
+        detection.prop(settings, "soft_bevels")
         layout.separator()
         layout.prop(settings, "use_existing_sharp")
         layout.prop(settings, "use_seams")

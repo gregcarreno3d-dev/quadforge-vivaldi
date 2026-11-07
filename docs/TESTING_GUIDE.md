@@ -1,4 +1,4 @@
-# Testing guide for QuadForge Vivaldi 0.11.1
+# Testing guide for QuadForge Vivaldi 0.12.0
 
 Thank you for testing. The engine passes its automated tests on Linux, Windows and macOS in continuous integration, and the
 add-on was run on Blender 4.2, 4.5, 5.1 and 5.2 on Linux. What has **not** had real use is Windows and macOS on real
@@ -32,7 +32,7 @@ Use your own models where you can: a character or creature sculpt, a hard-surfac
 Open an issue at the repository, or write to the person who sent you the zip, with:
 
 - your operating system and Blender version (Help > About Blender);
-- the QuadForge version (0.11.1) and the settings you used (a screenshot of the panel is enough);
+- the QuadForge version (0.12.0) and the settings you used (a screenshot of the panel is enough);
 - what you expected and what happened; the **Last Result** box and any yellow warning text, copied exactly;
 - if you can share it, the model (or a cut-down version) that fails.
 
