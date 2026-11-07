@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1 - 2026-11-07
+
+Fixed
+- **Odd patches around the eyes and nose of faces and creatures** (seen on the Hada and female head tests): Rounded Bevels took eyelid and nose folds for mechanical bevels. Bevels are now only looked for when at least 15 % of the surface is truly planar (no face leaning more than 3 degrees from its plane), so organic shapes behave exactly as with the option off.
+- Thin chamfer strips are refined harder first (rows closer to clean); when the engine's grid method cannot follow, the add-on retries with a gentler refinement, so the gear-like and thin-plate cases still use the grid method.
+- The bevel detector no longer reports bands that were discarded, which pushed some parts onto the engine's pairing fallback.
+
 ## 0.13.0 - 2026-11-07
 
 Changed

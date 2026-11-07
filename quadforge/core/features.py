@@ -115,6 +115,9 @@ SOFT_BAND_NARROW = 1.0              # patches narrower than this many quad lengt
 SOFT_BAND_MIN_WIDTH = 1.2           # a band must be at least this many quad lengths wide to carry two edge loops
 SOFT_BAND_MAX_TURN = 150.0          # degrees: a band turning the surface right back on itself is a closed curved surface
 SOFT_BAND_MAX_WIDTH = 5.0           # wider than this many quad lengths it is a curved surface, not a bevel (a sphere is one big band)
+SOFT_PLANAR_DEVIATION_DEGREES = 3.0  # a patch is a true plane when no face leans more than this from its average normal
+SOFT_PLANAR_MIN_WIDTH = 2.0         # planes narrower than this many quad lengths do not count
+SOFT_MIN_PLANAR_FRACTION = 0.15     # share of the surface that must be planar before bevels are looked for (organic shapes have none)
 SOFT_MIN_CHAIN_QUADS = 3.0          # boundary chains shorter than this many quad lengths are noise
 
 
@@ -160,6 +163,18 @@ def detect_soft_bevels(m: geo.MeshArrays, angle_deg: float, quad_length: float, 
     perimeter += np.bincount(patch[second[two_sided]], weights=lengths[two_sided], minlength=n_patch)
     width = 2.0 * patch_area / np.maximum(perimeter, 1e-30)
     narrow = width < SOFT_BAND_NARROW * quad_length
+
+    # Organic shapes (faces, creatures) chain their gentle dihedrals into drifting 'flat' patches and show bands
+    # everywhere; a mechanical part has real planes. Only look for bevels when enough of the surface is truly planar.
+    drift_normal = np.zeros((n_patch, 3))
+    np.add.at(drift_normal, patch, normals * areas[:, None])
+    drift_normal /= np.maximum(np.linalg.norm(drift_normal, axis=1), 1e-30)[:, None]
+    face_cosine = np.einsum("ij,ij->i", normals, drift_normal[patch])
+    worst_cosine = np.ones(n_patch)
+    np.minimum.at(worst_cosine, patch, face_cosine)
+    planar = (worst_cosine >= np.cos(np.radians(SOFT_PLANAR_DEVIATION_DEGREES))) & (width >= SOFT_PLANAR_MIN_WIDTH * quad_length)
+    if patch_area[planar].sum() < SOFT_MIN_PLANAR_FRACTION * max(float(areas.sum()), 1e-30):
+        return nothing
 
     soft_edges = np.flatnonzero(soft)
     pa, pb = patch[first[soft_edges]], patch[second[soft_edges]]

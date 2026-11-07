@@ -64,6 +64,7 @@ DUPLICATE_VERTEX_DISTANCE = 1e-6          # relative to the model size; merges d
 MIN_SYMMETRY_TOLERANCE = 1e-7             # relative to the model size
 MIN_FACES_PER_PIECE = 8                   # never ask the engine for fewer quads than this
 MAX_HARD_EDGE_FRACTION = 0.25             # warn if more than 25% of the edges are "hard"
+THIN_BAND_STRONG_FLOOR = 0.6            # first try: the cleanest rows along thin chamfer strips (the engine's grid may refuse it)
 THIN_BAND_FLOOR = 0.75                   # strongest refinement of a thin strip between hard edges (finer breaks the engine's grid)
 THIN_BAND_MIN_LENGTH = 12.0              # only long strips (rims, chamfer rings, fillets) are refined
 THIN_BAND_REACH = 3.0                     # bands between hard edges narrower than this many quad lengths get finer faces
@@ -547,14 +548,16 @@ class LevelConstraints:
     quad_length: float              # typical edge length of the quads this level will have
     feature_segments: tuple = None  # (starts, ends) of the geometric hard edges, or None
     has_guides: bool = False        # symmetry guide lines were marked (the engine must align to them)
+    fallback_density: np.ndarray = None   # gentler density to retry with if the engine cannot follow the stronger one
 
 
 def _refine_thin_bands(mesh, arrays, hard: np.ndarray, areas: np.ndarray, quad_length: float, band: np.ndarray,
-                       bevel_scale: float) -> int:
+                       bevel_scale: float):
     """Faces between hard edges that are narrower than a quad (a chamfer strip, the facets of a rounded bevel) cannot hold
     a row of quads at the normal size: the rows zigzag across them. Give those faces a smaller target size, in
-    proportion to the band width (never below ``floor`` times the normal size); the engine blends it into the
-    surroundings. Returns how many vertices were refined."""
+    proportion to the band width; the engine blends it into the surroundings. The strongest refinement is tried first;
+    a gentler version is returned as well, for a retry when the engine's grid method cannot follow the strong one.
+    Returns ``(vertices refined, gentler multiplier or None)``."""
     first, second, counts = geo.edge_face_pairs(arrays)
     interior = (counts == 2) & ~hard
     patch = geo.connected_labels(arrays.n_polys, first[interior], second[interior])
@@ -569,24 +572,30 @@ def _refine_thin_bands(mesh, arrays, hard: np.ndarray, areas: np.ndarray, quad_l
     area = np.bincount(patch, weights=areas, minlength=n_patch)
     width = 2.0 * area / np.maximum(perimeter, 1e-30)
     reach = THIN_BAND_REACH
-    scale = np.clip(width / (reach * quad_length), THIN_BAND_FLOOR, 1.0)
     length = perimeter / 2.0 - width
-    scale[length < THIN_BAND_MIN_LENGTH * quad_length] = 1.0          # short strips (gear teeth) are left alone
-    face_scale = scale[patch]
-    if not (face_scale < 1.0).any() and not band.any():
-        return 0
-    multiplier = np.ones(arrays.n_verts)
-    np.minimum.at(multiplier, arrays.loop_verts, face_scale[arrays.loop_poly])
-    multiplier[band] = np.minimum(multiplier[band], bevel_scale)      # the facets of a rounded bevel need more
     current = mio.read_attribute(mesh, DENSITY_ATTRIBUTE, arrays.n_verts)
-    if current is not None:
-        multiplier = np.minimum(multiplier, np.asarray(current, dtype=np.float64))
+
+    def multiplier_for(floor: float) -> np.ndarray:
+        scale = np.clip(width / (reach * quad_length), floor, 1.0)
+        scale[length < THIN_BAND_MIN_LENGTH * quad_length] = 1.0      # short strips (gear teeth) are left alone
+        face_scale = scale[patch]
+        multiplier = np.ones(arrays.n_verts)
+        np.minimum.at(multiplier, arrays.loop_verts, face_scale[arrays.loop_poly])
+        multiplier[band] = np.minimum(multiplier[band], bevel_scale)      # the facets of a rounded bevel need more
+        if current is not None:
+            multiplier = np.minimum(multiplier, np.asarray(current, dtype=np.float64))
+        return multiplier
+
+    strong = multiplier_for(THIN_BAND_STRONG_FLOOR)
+    if not (strong < 1.0).any():
+        return 0, None
+    gentle = multiplier_for(THIN_BAND_FLOOR)
     attribute = mesh.attributes.get(DENSITY_ATTRIBUTE)
     if attribute is not None:
         mesh.attributes.remove(attribute)
     attribute = mesh.attributes.new(name=DENSITY_ATTRIBUTE, type="FLOAT", domain="POINT")
-    attribute.data.foreach_set("value", multiplier.astype(np.float32))
-    return int((multiplier < 1.0).sum())
+    attribute.data.foreach_set("value", strong.astype(np.float32))
+    return int((strong < 1.0).sum()), (None if np.allclose(strong, gentle) else gentle)
 
 
 def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: int,
@@ -645,11 +654,13 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
                    f"The angle is probably too low: raise it to keep the remesh clean.")
         if message not in warnings:
             warnings.append(message)
+    fallback_density = None
     if settings.soft_bevels and settings.soft_bevel_detail < 1.0 and geometric.any() and soft_band is not None:
-        _refine_thin_bands(mesh, arrays, hard & ~planes, areas, quad_length, soft_band, settings.soft_bevel_detail)
+        _refined, fallback_density = _refine_thin_bands(mesh, arrays, hard & ~planes, areas, quad_length, soft_band,
+                                                        settings.soft_bevel_detail)
     mio.write_edge_flag(mesh, "use_edge_sharp", hard)
     segments = features.feature_segments(arrays, geometric) if geometric.any() else None
-    return LevelConstraints(hard_count_shown, quad_length, segments, guide_lines > 0)
+    return LevelConstraints(hard_count_shown, quad_length, segments, guide_lines > 0, fallback_density)
 
 
 # --------------------------------------------------------------------------- stage 6b
@@ -691,7 +702,7 @@ def _collapse_slivers(mesh) -> float:
 
 def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshSettings,
                         target_quads: int, hard_edge_count: int,
-                        temp: TemporaryData, engine_progress=None, warnings=None, guides=None):
+                        temp: TemporaryData, engine_progress=None, warnings=None, guides=None, fallback_density=None):
     """Generator: yields while the engine works; returns the remeshed mesh."""
     """Run the engine on ``mesh`` (a half if symmetric) and return the remeshed mesh."""
     quads_for_this_piece = max(MIN_FACES_PER_PIECE, round(target_quads / plan.engine_pieces))
@@ -713,6 +724,19 @@ def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshS
     try:
         try:
             yield from get_backend(settings.backend).remesh_steps(context, work_object, request)
+            if (fallback_density is not None and keep_input is not None and settings.output == "QUADS"
+                    and (request.engine_info or {}).get("method") == "pair"):
+                # the grid method gave up with the strong refinement of thin strips: run again with the gentler one
+                attribute = keep_input.attributes.get(DENSITY_ATTRIBUTE)
+                if attribute is not None:
+                    attribute.data.foreach_set("value", np.asarray(fallback_density, dtype=np.float32))
+                    request.engine_info.clear()
+                    discarded = work_object.data
+                    work_object.data = keep_input
+                    keep_input = keep_input.copy()
+                    if discarded is not mesh and discarded.users == 0:
+                        bpy.data.meshes.remove(discarded)
+                    yield from get_backend(settings.backend).remesh_steps(context, work_object, request)
             if keep_input is not None:
                 vanished = _collapse_slivers(work_object.data)
                 if vanished > SLIVER_RETARGET_FRACTION:
@@ -1151,7 +1175,8 @@ def run_steps(context, original, settings: RemeshSettings,
             with profiler.stage(f"Level {label}: engine"):
                 guides = collect_guides(mesh, plan) if (forge and settings.use_flow_guides and settings.output == "QUADS") else None
                 half_mesh = yield from _remesh_with_engine(context, level_input, plan, settings, target,
-                                                constraints.hard_edge_count, temp, engine_progress, warnings, guides)
+                                                constraints.hard_edge_count, temp, engine_progress, warnings, guides,
+                                                constraints.fallback_density)
             if plan.cut_after:
                 with profiler.stage(f"Level {label}: cut at the plane"):
                     sym.cut_result_to_half(half_mesh, plan)

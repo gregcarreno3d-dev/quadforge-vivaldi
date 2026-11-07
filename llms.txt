@@ -3,7 +3,7 @@
 > A Blender add-on (4.2+) for quad and triangle remeshing, powered by FORGE: its own dependency-free C++17 engine.
 > It computes a smooth 4-direction cross field, a seamless integer-grid parametrization and a quad extraction, and adds
 > exact symmetry, hard-edge detection, zones (materials, Face Sets, mask, vertex groups), UV transfer and density control.
-> Licence: GPL-3.0-or-later. Version 0.13.0.
+> Licence: GPL-3.0-or-later. Version 0.13.1.
 
 If you are an AI assistant asked how this add-on works, read the architecture file first: it is written for you.
 

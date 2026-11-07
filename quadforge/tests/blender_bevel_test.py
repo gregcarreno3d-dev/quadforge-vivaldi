@@ -1,4 +1,5 @@
 """Rounded (soft) bevels and thin chamfer strips on a hard-surface part: the remesh must keep their profile."""
+import math
 import sys
 import numpy as np
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
@@ -63,5 +64,19 @@ p_on, p_off = np.percentile(d_on, 99), np.percentile(d_off, 99)
 print("p99 deviation (percent of diameter): soft bevels on %.3f, off %.3f" % (p_on, p_off))
 check(p_on < 0.6, "profile of the rounded bevels kept (p99 %.3f percent of the diameter)" % p_on)
 check(p_on <= p_off * 1.05, "soft bevel handling is not worse than without it")
+# an organic shape (smooth sphere with soft folds, like eyelids) has no planes: no bevels may be found on it
+import bmesh
+from quadforge.core import features, geometry as geo, mesh_io as mio
+bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=6, radius=10.0)
+for v in bm.verts:
+    x, y, z = v.co
+    v.co *= 1.0 + 0.04 * math.sin(1.6 * x) * math.cos(1.3 * y) + 0.03 * math.sin(2.1 * z + x)
+organic_mesh = bpy.data.meshes.new("organic"); bm.to_mesh(organic_mesh); bm.free()
+arrays = mio.read_mesh_arrays(organic_mesh)
+organic_normals, organic_areas = geo.polygon_normals_areas(arrays)
+organic_ql = geo.quad_edge_length(float(organic_areas.sum()), 20000)
+found, band = features.detect_soft_bevels(arrays, 30.0, organic_ql, normals=organic_normals, areas=organic_areas, band_vertices=True)
+check(int(found.sum()) == 0 and int(band.sum()) == 0, "no bevels are found on an organic shape (%d edges)" % int(found.sum()))
+
 print("ALL PASSED" if not fails else "%d FAILED" % len(fails))
 sys.exit(1 if fails else 0)

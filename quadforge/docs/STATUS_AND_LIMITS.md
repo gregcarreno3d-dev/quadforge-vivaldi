@@ -1,4 +1,4 @@
-# Status and limits — QuadForge Vivaldi 0.13.0
+# Status and limits — QuadForge Vivaldi 0.13.1
 
 ## Tested
 - FORGE engine (Linux): sphere, torus, box with 12 exact hard edges, hemisphere with border, cylinder, density (length ratio 2.99 vs 3 requested), meshes with defects, 120 random cases with no failures, 1.3 M tris → 40 K in ~7 s (peak ~390 MB).
