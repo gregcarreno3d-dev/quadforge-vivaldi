@@ -1,4 +1,4 @@
-# QuadForge Vivaldi — version 0.13.1
+# QuadForge Vivaldi — version 0.14.0
 
 > Entry document for any person or AI receiving this add-on. Read it first; details are in `docs/`.
 
@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Name | **QuadForge Vivaldi** (internal extension id: `quadforge`; it does not change, so upgrades keep working) |
-| Version | **0.13.1** (series name: *Vivaldi*) |
+| Version | **0.14.0** (series name: *Vivaldi*) |
 | Author | GregCarreno3D |
 | License | GPL-3.0-or-later |
 | Requires | Blender 4.2 or newer |
@@ -28,12 +28,12 @@ operators.py            buttons: Remesh, Apply Preset, Reset Settings
 ui.py                   sidebar panels (N > QuadForge)
 guidance.py planning.py presets.py texts.py translations.py   live advice, pure rules, presets, English texts, optional Spanish
 core/pipeline.py        the full remesh recipe (stages 1-9)
-core/backends/          engines: forge.py (own) and quadriflow.py (Blender)
+core/backends/          engines: forge.py (own engine)
 core/forge_io.py        .fmesh format (exchange with the engine)
 core/mesh_io.py geometry.py symmetry.py features.py detail.py profiling.py   NumPy/Blender utilities
 bin/<system>/forge      engine executable: windows, linux, macos-arm64, macos-x64
 engine_src/             C++ engine source + build.py (rebuild with Zig)
-devtools/               packager, engine tests, comparison with QuadriFlow, STL reader
+devtools/               packager, engine tests, STL reader
 docs/                   documentation (see below)
 tests/                  tests (no Blender needed except blender_integration_test.py)
 ```

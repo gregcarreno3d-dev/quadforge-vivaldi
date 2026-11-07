@@ -33,7 +33,7 @@ for use in (False, True):
             a = np.array(me.vertices[e.vertices[0]].co); b = np.array(me.vertices[e.vertices[1]].co)
             vals.append(bool(near_arc(a) < 0.03 and near_arc(b) < 0.03))
         at.data.foreach_set('value', vals)
-        s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = "QUADS"; s.target_quads = 3000
+        s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = 3000
         s.hide_original = False; s.use_flow_guides = use; s.sym_x = sym
         r = M.pipeline.run(M.bpy.context, obj, s)
         f, n = aligned(r.object.data, arc)

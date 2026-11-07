@@ -7,7 +7,7 @@ Run it inside Blender, from the folder that contains the ``quadforge`` folder.
 
   Your own sculpt (open the .blend, give the object name):
     blender yourfile.blend -b --python quadforge/tests/benchmark.py -- --object Dragon \\
-        --targets 20000,15000,10000,5000,4000 --sym X --polish 3 --out dragon.json
+        --targets 20000,15000,10000,5000,4000 --sym X --out dragon.json
 
   A synthetic mesh (no file needed), 1.3 million triangles:
     blender --factory-startup -b --python quadforge/tests/benchmark.py -- --synthetic-subdivisions 9
@@ -17,9 +17,6 @@ Options (all after the ``--``):
   --synthetic-subdivisions N    icosphere subdivisions of the synthetic blob (8 = 328K, 9 = 1.3M, 10 = 5.2M tris)
   --targets A,B,C               quad targets, largest first (default 20000,10000,5000,4000)
   --sym X|Y|Z|XY|XZ|YZ|XYZ     symmetry axes (default none)
-  --no-proxy                    do NOT use the working copy (to measure what it saves)
-  --no-snap                     do NOT snap back onto the original sculpt
-  --polish N                    polish passes (default 3)
   --out FILE.json               where to write the results (default quadforge_benchmark.json)
 """
 import argparse
@@ -54,9 +51,6 @@ def parse_arguments():
     parser.add_argument("--synthetic-subdivisions", type=int, default=9)
     parser.add_argument("--targets", default="20000,10000,5000,4000")
     parser.add_argument("--sym", default="")
-    parser.add_argument("--no-proxy", action="store_true")
-    parser.add_argument("--no-snap", action="store_true")
-    parser.add_argument("--polish", type=int, default=3)
     parser.add_argument("--out", default="quadforge_benchmark.json")
     return parser.parse_args(after_separator)
 
@@ -165,9 +159,6 @@ def main():
     settings = pipeline.RemeshSettings(
         target_quads=targets[0],
         extra_levels=",".join(str(value) for value in targets[1:]),
-        use_proxy=not arguments.no_proxy,
-        use_reproject=not arguments.no_snap,
-        polish_passes=arguments.polish,
         sym_x="X" in arguments.sym.upper(), sym_y="Y" in arguments.sym.upper(), sym_z="Z" in arguments.sym.upper(),
     )
     axes = [axis for axis, letter in enumerate("XYZ") if letter in arguments.sym.upper()]
@@ -188,9 +179,7 @@ def main():
     report = {
         "environment": environment_report(),
         "source": {"object": original.name, "faces": result.source_faces},
-        "settings": {"targets": targets, "symmetry": arguments.sym or "none", "working_copy": not arguments.no_proxy,
-                     "working_copy_faces_used": result.proxy_faces_used, "snap_to_original": not arguments.no_snap,
-                     "polish_passes": arguments.polish},
+        "settings": {"targets": targets, "symmetry": arguments.sym or "none"},
         "profile": result.profile,
         "levels": levels,
         "warnings": result.warnings,

@@ -1,6 +1,6 @@
 # QuadForge Vivaldi: architecture and behaviour, written for AI assistants
 
-Version described: **0.13.1**. Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.14.0**. Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -42,18 +42,17 @@ quadforge/                    the add-on (this folder is what Blender installs)
     geometry.py               MeshArrays, normals/areas, edge angles, zone labels from vertex groups, stats
     mesh_io.py                bulk read/write of Blender mesh data with foreach_get/foreach_set
     forge_io.py               .fmesh read/write
-    detail.py                 snap/polish/copy face data (used by the QuadriFlow route and zone copying)
+    detail.py                 relax badly shaped quads and project them back on the source
     uvtransfer.py             UV transfer by projection onto the original surface
     zonedata.py               Face Sets and sculpt-mask transfer
     profiling.py              stage timer + peak memory
     backends/
       base.py                 Backend, RemeshRequest, BackendError
       forge.py                runs the engine process, parses its output, writes the result into the mesh
-      quadriflow.py           optional second backend: Blender's built-in object.quadriflow_remesh
   bin/<platform>/forge[.exe]  prebuilt engines: windows, linux, macos-arm64, macos-x64
   engine_src/                 copy of engine/src shipped inside the add-on
   tests/                      Blender integration tests (run with the bpy module) and pure-Python tests
-  devtools/                   engine test suites (engine_tests/), QuadriFlow comparison, helpers
+  devtools/                   engine test suites (engine_tests/), helpers
   docs/                       user guide, decisions, status and limits, benchmark protocol
 engine/src/                   FORGE engine source (C++17, header-only modules + main.cpp)
 tools/                        build.py (Zig cross-compiler), package.py, make_delivery.py, quality_metrics.py,
@@ -82,9 +81,7 @@ Stages, in order (names are the profiler stage names):
 3. **Zone labels** `_compute_zone_labels` (if any zone option is on): face attribute `quadforge_zone` (integer).
    Sources: materials, Face Sets, mask (threshold), vertex groups (mean weight per face, argmax, `-1` below
    `group_cutoff`).
-4. **Working copy**: for the QuadriFlow route only. With FORGE, `RemeshSettings` is replaced by a copy with
-   `use_proxy=False, use_reproject=False, snap_features=False, polish_passes=0` (the engine projects onto the source
-   itself).
+4. **No working copy**: the engine reads the source directly and projects onto it itself.
 5. **Symmetry plan** `_plan_symmetry`. FORGE + QUADS + active symmetry → `plan.cut_after = True`: remesh the whole model,
    with the plane edges marked as guide lines. Otherwise cut first (`_clean_and_cut_to_half`).
    `FORGE_HALF_FIRST=1` (environment) forces cut-first.
@@ -254,8 +251,7 @@ merge valence-2 dead ends (≤ 6 rounds), `improveQuads(..., 40 sweeps, threshol
 |---|---|
 | `target_quads` | engine `--faces`; 16 minimum; the target menu offers 2K to 500K (150K and above are flagged as heavy) |
 | `extra_levels` | additional targets ("15K, 10K"); each is a separate engine run from the source; entries that are invalid, duplicated, not lower than the previous level or below 16 are ignored and reported |
-| `backend` | `FORGE` (default) or `QUADRIFLOW` |
-| `output` | `QUADS` or `TRIS` (FORGE only; QuadriFlow always quads) |
+| `output` | `QUADS` or `TRIS`  |
 | `use_sharp_angle`, `sharp_angle_deg` (35 default) | hard edges by dihedral angle |
 | `smart_features`, `min_feature_size` (2), `keep_right_angles` | chain filter of `features.py` |
 | `use_existing_sharp`, `use_seams` | extra hard edges |
@@ -269,7 +265,6 @@ merge valence-2 dead ends (≤ 6 rounds), `improveQuads(..., 40 sweeps, threshol
 | `transfer_uvs`, `transfer_zones` | UV maps, Face Sets and mask copied to the result |
 | `preserve_boundary` | keep open borders as lines |
 | `shading` | AUTO / SMOOTH / FLAT |
-| `seed` | QuadriFlow only |
 
 Surface profiles (`presets.SURFACE_PROFILES`): **Hard Surface** (hard edges from about 30°, right angles on, snapping
 on, Detail on Curves off) and **Organic**. Presets set target and angle and never touch symmetry or zones.

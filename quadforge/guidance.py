@@ -20,8 +20,7 @@ WARNING = "WARNING"
 INFO = "INFO"
 OK = "OK"
 
-LARGE_MESH_FACE_COUNT = 1_500_000          # without a working copy: slow and memory hungry
-LARGE_MESH_FACE_COUNT_WITH_PROXY = 6_000_000   # with a working copy: decimating still needs memory
+LARGE_MESH_FACE_COUNT = 6_000_000             # FORGE reads dense sculpts directly; ask before going beyond this
 OFF_CENTER_FRACTION = 0.05                 # origin farther than 5% of the model width from the middle
 AXIS_LETTERS = "XYZ"
 
@@ -56,12 +55,8 @@ class GuidanceOptions:
     use_face_sets: bool = False
     use_mask: bool = False
     use_vertex_groups: bool = False
-    use_proxy: bool = True                # build a lighter working copy for heavy sculpts
-    proxy_is_auto: bool = True
-    proxy_faces: int = 80_000             # size of that copy (already resolved by planning.py)
     ignored_levels: tuple = ()            # extra-level fragments that could not be used
     output_kind: str = "quads"            # "quads" or "tris" (what the user will get)
-    handles_heavy_meshes: bool = False    # FORGE reads dense sculpts directly: no heavy-mesh warning
 
 
 @dataclass(frozen=True)
@@ -101,10 +96,9 @@ def snapshot_from_object(blender_object) -> ObjectSnapshot:
     )
 
 
-def needs_confirmation(face_count: int, use_proxy: bool) -> bool:
+def needs_confirmation(face_count: int) -> bool:
     """Ask before starting when the mesh is heavy enough to freeze Blender for a long time."""
-    limit = LARGE_MESH_FACE_COUNT_WITH_PROXY if use_proxy else LARGE_MESH_FACE_COUNT
-    return face_count > limit
+    return face_count > LARGE_MESH_FACE_COUNT
 
 
 def build_guidance(snapshot: ObjectSnapshot, options: GuidanceOptions) -> list:
@@ -128,7 +122,6 @@ def build_guidance(snapshot: ObjectSnapshot, options: GuidanceOptions) -> list:
     if options.output_kind == "quads" and options.target_quads >= existing_detail:
         messages.append(GuidanceMessage(WARNING, texts.GUIDE_TARGET_NOT_LOWER, {
             "target": f"{options.target_quads:,}", "faces": f"{existing_detail:,}"}))
-    messages.extend(_speed_messages(snapshot, options))
     if options.ignored_levels:
         messages.append(GuidanceMessage(WARNING, texts.GUIDE_LEVELS_IGNORED,
                                         {"items": ", ".join(options.ignored_levels)}))
@@ -145,22 +138,6 @@ def build_guidance(snapshot: ObjectSnapshot, options: GuidanceOptions) -> list:
 
 def can_remesh(messages: list) -> bool:
     return not any(message.level == ERROR for message in messages)
-
-
-def _speed_messages(snapshot: ObjectSnapshot, options: GuidanceOptions) -> list:
-    """Explain the working copy (or warn that a heavy mesh will be processed whole)."""
-    messages = []
-    if options.use_proxy:
-        if planning.needs_proxy(snapshot.face_count, options.proxy_faces):
-            messages.append(GuidanceMessage(INFO, texts.GUIDE_USES_PROXY, {
-                "faces": f"{snapshot.face_count:,}", "proxy": f"{options.proxy_faces:,}"}))
-        if not options.proxy_is_auto and options.proxy_faces < planning.PROXY_SMALL_RATIO * options.target_quads:
-            messages.append(GuidanceMessage(WARNING, texts.GUIDE_PROXY_SMALL, {
-                "proxy": f"{options.proxy_faces:,}", "target": f"{options.target_quads:,}"}))
-    elif snapshot.face_count > LARGE_MESH_FACE_COUNT and not options.handles_heavy_meshes:
-        messages.append(GuidanceMessage(WARNING, texts.GUIDE_HEAVY_MESH,
-                                        {"faces": f"{snapshot.face_count:,}"}))
-    return messages
 
 
 def _zone_messages(snapshot: ObjectSnapshot, options: GuidanceOptions) -> list:

@@ -109,7 +109,7 @@ for target in (2000, 8000, 30000):
         near = np.array([near_loop(d, polylines) < 0.012 for d in dirs])
         attribute.data.foreach_set("value", [bool(near[e.vertices[0]] and near[e.vertices[1]]) for e in me.edges])
         s = M.pipeline.RemeshSettings()
-        s.backend = "FORGE"; s.output = "QUADS"; s.target_quads = target; s.hide_original = False
+        s.output = "QUADS"; s.target_quads = target; s.hide_original = False
         s.sym_x = True; s.curvature_detail = "MEDIUM"; s.use_flow_guides = guides
         r = M.pipeline.run(M.bpy.context, obj, s)
         st = r.levels[0].stats

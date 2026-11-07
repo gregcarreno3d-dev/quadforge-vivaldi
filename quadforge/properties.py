@@ -1,6 +1,5 @@
 """Settings stored in the scene (``scene.quadforge``) and the last result shown in the panel."""
 import math
-import os
 
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
@@ -58,16 +57,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
     )
 
     # ---------------------------------------------------------------- engine and output
-    backend: EnumProperty(
-        name="Engine",
-        description="Legacy setting kept for old scenes; FORGE is always used unless QUADFORGE_LEGACY_ENGINE=1 is set",
-        items=[
-            ("FORGE", "FORGE (QuadForge)", "QuadForge's own engine: quads or triangles, fast on heavy meshes, "
-                                           "paintable density. Runs as a separate process"),
-            ("QUADRIFLOW", "QuadriFlow (Blender)", "Blender's built-in quad remesher. Quads only"),
-        ],
-        default="FORGE",
-    )
     output_type: EnumProperty(
         name="Output",
         description="What kind of faces the result is made of",
@@ -123,27 +112,11 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
     extra_levels: StringProperty(
         name="Extra Levels",
         description="Lower face counts to build as well, separated by commas, for example 15K, 10K, 5K, 4K. "
-                    "Each level is made from the previous one with QuadriFlow and from your source with FORGE",
+                    "Each level is built from your source mesh",
         default="",
     )
 
-    # ---------------------------------------------------------------- speed and detail
-    use_proxy: BoolProperty(
-        name="Use Working Copy",
-        description="Remesh a lighter copy of heavy sculpts, then snap the result back onto the original. "
-                    "Much faster and uses far less memory",
-        default=True,
-    )
-    proxy_auto: BoolProperty(
-        name="Auto Size",
-        description="Size the working copy at 4 times the largest target (between 40,000 and 600,000 faces)",
-        default=True,
-    )
-    proxy_faces: IntProperty(
-        name="Working Copy Size",
-        description="Faces of the working copy. Use at least 3 to 4 times the target to keep the detail",
-        default=80_000, min=10_000, soft_max=400_000, max=2_000_000,
-    )
+    # ---------------------------------------------------------------- subdivision
     subdivision_match: BoolProperty(
         name="Subdivision Match",
         description="Move the vertices so that, once you add a Subdivision Surface modifier, the smooth result lies on "
@@ -152,17 +125,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         default=False,
     )
 
-    use_reproject: BoolProperty(
-        name="Keep Sculpt Detail",
-        description="Snap the result back onto your original sculpt so it follows every curve and corner",
-        default=True,
-    )
-    polish_passes: IntProperty(
-        name="Polish Passes",
-        description="How many times to even out the quads and snap them back onto the sculpt. "
-                    "0 only snaps; 2 to 4 gives a regular flow",
-        default=3, min=0, max=10,
-    )
 
     # ---------------------------------------------------------------- hard edges
     use_sharp_angle: BoolProperty(
@@ -211,13 +173,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         update=_unmark_surface,
         name="Keep Right Angles",
         description="Keep short runs of 90 degree corners (pegs, boxes, rims) even if they are small",
-        default=True,
-    )
-    snap_features: BoolProperty(
-        update=_unmark_surface,
-        name="Snap Corners to Edges",
-        description="Move the corner vertices of the result exactly onto the sharp edge lines of your model "
-                    "so corners stay crisp",
         default=True,
     )
     preserve_boundary: BoolProperty(
@@ -324,11 +279,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         description="Copy the sculpt Face Sets (polygroups) and the sculpt mask of the original onto the result, so it goes straight back into Sculpt Mode with the same groups",
         default=True,
     )
-    seed: IntProperty(
-        name="Seed",
-        description="Random seed of the engine. Change it to get a different edge flow",
-        default=0, min=0,
-    )
 
     # ---------------------------------------------------------------- last result (read by the UI)
     last_has_report: BoolProperty(default=False, options={"SKIP_SAVE"})
@@ -339,35 +289,22 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
     last_poles: IntProperty(default=0, options={"SKIP_SAVE"})
     last_hard_edges: IntProperty(default=0, options={"SKIP_SAVE"})
     last_seconds: FloatProperty(default=0.0, options={"SKIP_SAVE"})
-    last_corners_snapped: IntProperty(default=0, options={"SKIP_SAVE"})
     last_peak_memory_gb: FloatProperty(default=0.0, options={"SKIP_SAVE"})   # 0 = unknown
     last_levels_text: StringProperty(default="", options={"SKIP_SAVE"})      # one line per level
     last_warnings: StringProperty(default="", options={"SKIP_SAVE"})
-
-    @property
-    def engine(self) -> str:
-        """The engine that really runs. FORGE is the only one offered; the legacy QuadriFlow route stays reachable for
-        development (environment variable QUADFORGE_LEGACY_ENGINE=1) while it is being retired."""
-        return self.backend if os.environ.get("QUADFORGE_LEGACY_ENGINE") == "1" else "FORGE"
 
     def to_settings(self) -> RemeshSettings:
         """Copy the UI values into a plain object the pipeline can use (no Blender types)."""
         return RemeshSettings(
             target_quads=self.target_quads,
             extra_levels=self.extra_levels,
-            backend=self.engine,
-            output="QUADS" if self.engine != "FORGE" else self.output_type,
+            output=self.output_type,
             density_group=self.density_group,
             density_ratio=self.density_ratio,
             zone_factors={item.name: item.factor for item in self.zone_factors if abs(item.factor - 1.0) > 1e-6},
             curvature_detail=self.curvature_detail,
             use_flow_guides=self.use_flow_guides,
-            use_proxy=self.use_proxy,
-            proxy_auto=self.proxy_auto,
-            proxy_faces=self.proxy_faces,
-            use_reproject=self.use_reproject,
             subdivision_match=self.subdivision_match,
-            polish_passes=self.polish_passes,
             use_sharp_angle=self.use_sharp_angle,
             sharp_angle_deg=math.degrees(self.sharp_angle),
             use_existing_sharp=self.use_existing_sharp,
@@ -376,7 +313,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
             smart_features=self.smart_features,
             min_feature_size=self.min_feature_size,
             keep_right_angles=self.keep_right_angles,
-            snap_features=self.snap_features,
             shading=self.shading,
             preserve_boundary=self.preserve_boundary,
             use_materials=self.use_materials,
@@ -390,7 +326,6 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
             sym_tolerance=self.sym_tolerance,
             check_symmetry=self.check_symmetry,
             clean_input=self.clean_input,
-            seed=self.seed,
             hide_original=self.hide_original,
             transfer_uvs=self.transfer_uvs,
             transfer_zones=self.transfer_zones,

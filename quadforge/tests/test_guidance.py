@@ -67,7 +67,7 @@ def test_healthy_mesh_is_ready():
     assert messages[0].level == guidance.OK and messages[0].template == texts.GUIDE_READY
     assert messages[0].values["faces"] == "200,000" and messages[0].values["target"] == "4,000"
     assert guidance.can_remesh(messages)
-    assert templates(messages) == [texts.GUIDE_READY, texts.GUIDE_USES_PROXY]   # 200K > 1.5 x 80K
+    assert templates(messages) == [texts.GUIDE_READY]
 
 
 def test_light_mesh_does_not_mention_the_working_copy():
@@ -88,28 +88,6 @@ def test_target_is_compared_with_quad_equivalent_not_triangle_count():
     assert texts.GUIDE_TARGET_NOT_LOWER not in templates(guidance.build_guidance(triangles, Options(target_quads=10_000)))
 
 
-def test_heavy_mesh_without_working_copy_warns():
-    messages = guidance.build_guidance(healthy_snapshot(face_count=2_000_000), Options(use_proxy=False))
-    assert texts.GUIDE_HEAVY_MESH in templates(messages)
-    assert texts.GUIDE_USES_PROXY not in templates(messages)
-
-
-def test_heavy_mesh_with_working_copy_is_explained_not_warned():
-    messages = guidance.build_guidance(healthy_snapshot(face_count=3_000_000), Options(use_proxy=True))
-    found = templates(messages)
-    assert texts.GUIDE_USES_PROXY in found and texts.GUIDE_HEAVY_MESH not in found
-    info = [m for m in messages if m.template == texts.GUIDE_USES_PROXY][0]
-    assert info.values["faces"] == "3,000,000" and info.values["proxy"] == "80,000"
-
-
-def test_small_manual_working_copy_warns():
-    options = Options(target_quads=20_000, use_proxy=True, proxy_is_auto=False, proxy_faces=40_000)
-    found = templates(guidance.build_guidance(healthy_snapshot(face_count=3_000_000), options))
-    assert texts.GUIDE_PROXY_SMALL in found
-    auto = Options(target_quads=20_000, use_proxy=True, proxy_is_auto=True, proxy_faces=80_000)
-    assert texts.GUIDE_PROXY_SMALL not in templates(guidance.build_guidance(healthy_snapshot(), auto))
-
-
 def test_ignored_levels_are_reported():
     options = Options(ignored_levels=("abc", "99999"))
     messages = guidance.build_guidance(healthy_snapshot(face_count=50_000), options)
@@ -118,10 +96,8 @@ def test_ignored_levels_are_reported():
 
 
 def test_confirmation_thresholds():
-    assert not guidance.needs_confirmation(3_000_000, use_proxy=True)
-    assert guidance.needs_confirmation(7_000_000, use_proxy=True)
-    assert guidance.needs_confirmation(2_000_000, use_proxy=False)
-    assert not guidance.needs_confirmation(1_000_000, use_proxy=False)
+    assert not guidance.needs_confirmation(3_000_000)
+    assert guidance.needs_confirmation(7_000_000)
 
 
 def test_mode_and_modifiers_are_explained():

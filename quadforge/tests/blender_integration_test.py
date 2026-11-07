@@ -230,7 +230,7 @@ def materials_are_isolated_and_transferred():
     original.data.materials.append(bpy.data.materials.new("B"))
     for polygon in original.data.polygons:
         polygon.material_index = 1 if polygon.center.z > 0 else 0
-    result = run_pipeline(original, target_quads=1000, use_materials=True, use_proxy=False)
+    result = run_pipeline(original, target_quads=1000, use_materials=True)
     assert len(result.object.material_slots) == 2
     indices = mio.read_material_indices(result.object.data)
     print(f"      faces per material: {np.bincount(indices).tolist()}  hard edges: {result.hard_edge_count}")
@@ -287,39 +287,16 @@ def empty_mesh_gives_a_clear_error():
 # --------------------------------------------------------------------------- v0.3: working copy, detail, levels
 
 @scenario
-def heavy_mesh_uses_a_working_copy_and_keeps_the_detail():
+def dense_mesh_is_remeshed_directly_and_keeps_the_detail():
     original = heavy_blob(subdivisions=8)                       # 327,680 triangles
     faces_in = len(original.data.polygons)
-    result = run_pipeline(original, backend="QUADRIFLOW", target_quads=2000, sym_x=True)
-    print(f"      source {faces_in} faces -> working copy {result.proxy_faces_used} -> result {result.stats['faces']} faces")
-    assert result.proxy_faces_used is not None and result.proxy_faces_used <= 60_000
+    result = run_pipeline(original, target_quads=2000, sym_x=True)
+    print(f"      source {faces_in} faces -> result {result.stats['faces']} faces")
     assert abs(result.stats["faces"] - 2000) / 2000 < 0.3
     distances = distances_to_original(original, result.object)
     diagonal = geo.bbox_diagonal(mio.read_vertex_coordinates(original.data))
     print(f"      distance to the original surface: max {distances.max() / diagonal:.2e} of the diagonal")
     assert distances.max() / diagonal < 2e-3
-
-
-@scenario
-def snapping_to_the_original_beats_not_snapping():
-    original = heavy_blob(subdivisions=7)                       # 81,920 triangles
-    snapped = run_pipeline(original, backend="QUADRIFLOW", target_quads=1500, use_reproject=True, hide_original=False)
-    loose = run_pipeline(original, backend="QUADRIFLOW", target_quads=1500, use_reproject=False, hide_original=False)
-    diagonal = geo.bbox_diagonal(mio.read_vertex_coordinates(original.data))
-    error_snapped = distances_to_original(original, snapped.object).mean() / diagonal
-    error_loose = distances_to_original(original, loose.object).mean() / diagonal
-    print(f"      mean distance to the sculpt: snapped {error_snapped:.2e}, not snapped {error_loose:.2e}")
-    assert error_snapped <= error_loose * 1.05 + 1e-9
-
-
-@scenario
-def polish_passes_do_not_make_the_quads_less_even():
-    original = dense_ellipsoid()
-    raw = run_pipeline(original, backend="QUADRIFLOW", target_quads=1500, polish_passes=0, hide_original=False)
-    polished = run_pipeline(original, backend="QUADRIFLOW", target_quads=1500, polish_passes=4, hide_original=False)
-    variation_raw, variation_polished = edge_length_variation(raw.object), edge_length_variation(polished.object)
-    print(f"      edge length variation: no polish {variation_raw:.3f}, 4 passes {variation_polished:.3f}")
-    assert variation_polished <= variation_raw * 1.10
 
 
 @scenario
@@ -347,17 +324,16 @@ def level_ladder_stays_symmetric():
 
 
 @scenario
-def zones_survive_the_working_copy():
+def zones_survive_a_dense_source():
     original = heavy_blob(subdivisions=8)
     original.data.materials.append(bpy.data.materials.new("A"))
     original.data.materials.append(bpy.data.materials.new("B"))
     for polygon in original.data.polygons:
         polygon.material_index = 1 if polygon.center.z > 0 else 0
-    result = run_pipeline(original, backend="QUADRIFLOW", target_quads=2000, use_materials=True)
+    result = run_pipeline(original, target_quads=2000, use_materials=True)
     indices = mio.read_material_indices(result.object.data)
-    print(f"      working copy {result.proxy_faces_used}, faces per material {np.bincount(indices).tolist()}, "
+    print(f"      faces per material {np.bincount(indices).tolist()}, "
           f"hard edges {result.hard_edge_count}, warnings {result.warnings}")
-    assert result.proxy_faces_used is not None
     assert set(np.unique(indices)) == {0, 1}
     assert result.hard_edge_count > 0
 
@@ -441,25 +417,12 @@ def seam_has_no_gaps_with_a_noisy_engine_border():
 @scenario
 def snapping_does_not_collapse_quads():
     original = heavy_blob(subdivisions=7)
-    result = run_pipeline(original, target_quads=1500, sym_x=True, polish_passes=4)
+    result = run_pipeline(original, target_quads=1500, sym_x=True)
     arrays = mio.read_mesh_arrays(result.object.data)
     lengths = geo.edge_lengths(arrays)
     print(f"      shortest edge {lengths.min():.4f}, mean {lengths.mean():.4f}, non-manifold {result.stats['non_manifold_edges']}")
     assert lengths.min() > 0.05 * lengths.mean()
     assert result.stats["non_manifold_edges"] == 0
-
-
-@scenario
-def corners_snap_onto_the_box_edge_lines():
-    original = subdivided_box()
-    snapped = run_pipeline(original, backend="QUADRIFLOW", target_quads=600, snap_features=True, hide_original=False)
-    loose = run_pipeline(original, backend="QUADRIFLOW", target_quads=600, snap_features=False, hide_original=False)
-    near_snapped = distance_to_box_edge_lines(mio.read_mesh_arrays(snapped.object.data).co.astype(np.float64))
-    near_loose = distance_to_box_edge_lines(mio.read_mesh_arrays(loose.object.data).co.astype(np.float64))
-    print(f"      corner vertices: snapped {len(near_snapped)} (mean dist {near_snapped.mean():.4f}, "
-          f"corners moved {snapped.corners_snapped}), not snapped {len(near_loose)} (mean dist {near_loose.mean():.4f})")
-    assert snapped.corners_snapped > 0
-    assert near_snapped.mean() <= near_loose.mean() + 1e-9
 
 
 @scenario
@@ -501,13 +464,12 @@ ALL_SCENARIOS = (
     smooth_surface_has_no_hard_edges_with_a_high_angle, materials_are_isolated_and_transferred,
     asymmetric_mesh_gives_a_warning, transform_is_copied_to_the_result,
     temporary_data_is_cleaned_up, empty_mesh_gives_a_clear_error,
-    heavy_mesh_uses_a_working_copy_and_keeps_the_detail, snapping_to_the_original_beats_not_snapping,
-    polish_passes_do_not_make_the_quads_less_even, level_ladder_builds_every_level,
-    level_ladder_stays_symmetric, zones_survive_the_working_copy, profile_reports_stage_times_and_memory,
+    dense_mesh_is_remeshed_directly_and_keeps_the_detail, level_ladder_builds_every_level,
+    level_ladder_stays_symmetric, zones_survive_a_dense_source, profile_reports_stage_times_and_memory,
     remesh_button_works_and_stores_the_last_result, preset_buttons_set_target_angle_and_levels,
     reset_button_restores_defaults,
     mirrored_half_is_not_inside_out, seam_has_no_gaps_with_a_noisy_engine_border,
-    snapping_does_not_collapse_quads, corners_snap_onto_the_box_edge_lines,
+    snapping_does_not_collapse_quads,
     smart_detection_ignores_tiny_noise_but_keeps_the_box, shading_modes_are_applied,
     high_quality_presets_exist_and_work,
 )

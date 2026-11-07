@@ -1,4 +1,4 @@
-# User guide — QuadForge Vivaldi 0.13.1
+# User guide — QuadForge Vivaldi 0.14.0
 
 ## 1. Basic flow (3 steps)
 1. Select the mesh (triangles or quads, any density). The add-on switches to Object Mode by itself.
@@ -10,7 +10,7 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 ## 2. Main options
 | Option | What it does |
 |---|---|
-| **Engine** | *FORGE*, the add-on's own engine (quads or triangles, reads heavy sculpts directly, paintable density). It is the only engine offered; the old QuadriFlow route is being retired. |
+| **Engine** | *FORGE*, the add-on's own engine (quads or triangles, reads heavy sculpts directly, paintable density). It is the only engine. |
 | **Output** (FORGE only) | *Quads* (animation, subdivision, sculpting) or *Triangles* (games, 3D printing, simulation; even, well-shaped triangles). |
 | **Target Faces** | Approximate face count of the result (the real count varies by a few percent). |
 | **Surface type** | Hard Surface: hard edges from 30°, right angles and snapping on, Detail on Curves Off. Soft Surface / Organic: hard-edge detection off (your own sharp edges and seams still count), Detail on Curves Medium. Neither touches symmetry, zones, output or engine. Changing one of those values by hand unmarks the button. |
@@ -21,14 +21,13 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 - **Hard Edges:** keeps marked corners as clean edge chains. Lower *Angle* = more edges. *Smart Detection* ignores noise smaller than two quads and keeps right angles. Sharp edges and UV seams can also be respected. *Rounded Bevels* also keeps fillets made of several soft facets (each below the angle) and refines them; turn it off if a smooth organic surface gets unwanted edge rows. *Keep Open Borders* keeps outlines of open meshes.
 - **Isolate Zones:** separates by material, Face Set, sculpt mask or vertex group (paint areas in different groups, like ZBrush polygroups) with clean loops.
 - **Symmetry:** local X/Y/Z axes. One half is remeshed, then mirrored and welded. Check *Plane At* if the origin is not centred.
-- **Extra Levels:** `15K, 10K, 5K, 4K` builds several levels in one run (with FORGE each comes from the source; with QuadriFlow, from the previous one).
+- **Extra Levels:** `15K, 10K, 5K, 4K` builds several levels in one run (each level is built from the source).
 - **Density (FORGE):** pick a *vertex group*; where the weight is 1 the edges are *Detail Ratio* times shorter (4 ⇒ about 16× more faces there). Paint it in Weight Paint mode.
 - **Detail by Zone (FORGE):** turn on an option in *Isolate Zones*, press *Refresh Zones*, then give each zone a number: above 1 gives that zone more faces, below 1 fewer. The engine keeps a clean quad flow, so the change is gradual (a 2 gives roughly 1.7 times more faces in the zone) and it is blended over about eight cells next to the zone border.
 - **Quick Preview:** makes a small copy (about 3,000 faces, usually a few seconds, about 6 s for a 248,000-face head) with your current settings so you can check the flow before the full run. It never touches your original and is deleted when you run the full Remesh.
 - **Subdivision Match (Advanced):** for quads that you will subdivide. A Subdivision Surface modifier shrinks a mesh; this option moves the vertices so the smooth result lands on your original surface (in a test the error after two levels fell about 40 times). Made for smooth, organic shapes: sharp creases stay where they are and no point moves more than a third of an edge.
-- **Speed and Detail (QuadriFlow):** working copy, reprojection and polish. Not used by FORGE.
 - **Last Result:** faces, quad %, poles, time, warnings. Poles are not shown for triangles.
-- **Advanced:** shading, clean mesh, hide original, copy UV maps, copy Face Sets and mask, seed (QuadriFlow).
+- **Advanced:** shading, clean mesh, hide original, copy UV maps, copy Face Sets and mask, .
 
 ## 4. Recipes
 - **Character for animation:** FORGE, Quads, Character preset, X symmetry.

@@ -46,7 +46,7 @@ def deviation(src, res):
 
 
 def remesh(src, soft):
-    s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = "QUADS"; s.target_quads = 20000; s.hide_original = False
+    s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = 20000; s.hide_original = False
     s.use_sharp_angle = True; s.sharp_angle_deg = 30.0; s.curvature_detail = "OFF"; s.soft_bevels = soft
     r = M.pipeline.run(bpy.context, src, s)
     return r.levels[0].object, r.levels[0].stats

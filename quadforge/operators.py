@@ -41,7 +41,6 @@ def _store_last_report(settings, result: pipeline.RemeshResult) -> None:
     settings.last_ngons = stats["ngons"]
     settings.last_poles = stats["poles_3"] + stats["poles_5plus"]
     settings.last_hard_edges = first.hard_edge_count
-    settings.last_corners_snapped = result.corners_snapped
     settings.last_seconds = float(result.profile.get("total_seconds", 0.0))
     peak_mb = result.profile.get("peak_memory_mb")
     settings.last_peak_memory_gb = (peak_mb / BYTES_PER_GB_IN_MB) if peak_mb else 0.0
@@ -90,8 +89,7 @@ class QUADFORGE_OT_remesh(bpy.types.Operator):
         self.interactive = True
         snapshot = guidance.snapshot_from_object(context.active_object)
         scene_settings = context.scene.quadforge
-        lightweight = scene_settings.use_proxy or scene_settings.engine == "FORGE"
-        if not guidance.needs_confirmation(snapshot.face_count, lightweight):
+        if not guidance.needs_confirmation(snapshot.face_count):
             return self.execute(context)
         window_manager = context.window_manager
         try:

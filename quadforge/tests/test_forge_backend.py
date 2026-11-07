@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT.parent / "tools"))
 package = types.ModuleType("qf")
 package.__path__ = [str(ROOT)]
 sys.modules["qf"] = package
-sys.modules["bpy"] = types.ModuleType("bpy")          # quadriflow.py imports it; never used here
+sys.modules["bpy"] = types.ModuleType("bpy")          # backends may import it; never used here
 forge = importlib.import_module("qf.core.backends.forge")
 base = importlib.import_module("qf.core.backends.base")
 forge_io = importlib.import_module("qf.core.forge_io")

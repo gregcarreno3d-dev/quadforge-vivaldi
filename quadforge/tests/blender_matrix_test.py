@@ -113,7 +113,6 @@ def check(label, shape, target, objkw, settings):
     open_in = bool(__import__("harness").independent_checks(co, np.full(len(tris), 3), np.asarray(tris).reshape(-1))["boundary_edges"])
     obj = make(shape, co, tris, **objkw)
     s = pipeline.RemeshSettings()
-    s.backend = "FORGE"
     s.output = "QUADS"
     s.target_quads = target
     s.hide_original = False

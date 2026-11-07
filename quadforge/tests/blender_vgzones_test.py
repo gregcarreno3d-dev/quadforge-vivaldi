@@ -19,7 +19,7 @@ def sphere():
     return obj
 
 def run(obj, **kw):
-    s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = "QUADS"; s.target_quads = 1500; s.hide_original = False
+    s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = 1500; s.hide_original = False
     s.use_sharp_angle = False
     for k, v in kw.items():
         setattr(s, k, v)

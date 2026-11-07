@@ -20,16 +20,6 @@ SPANISH_FROM_TEXTS = {
     texts.GUIDE_TARGET_NOT_LOWER: (
         "El objetivo ({target}) no es menor que el detalle que ya tiene esta malla (unos {faces} quads), "
         "así que el resultado no será más simple."),
-    texts.GUIDE_HEAVY_MESH: (
-        "Esta malla es muy densa ({faces} caras) y la copia de trabajo está desactivada. Remallar puede "
-        "tardar varios minutos y usar mucha memoria. Activa 'Usar copia de trabajo' o decímala antes."),
-    texts.GUIDE_USES_PROXY: (
-        "Este sculpt es pesado ({faces} caras). QuadForge primero hará una copia de trabajo más ligera de "
-        "unas {proxy} caras (más rápido y con mucha menos memoria) y luego ajustará el resultado a tu "
-        "sculpt original para conservar el detalle."),
-    texts.GUIDE_PROXY_SMALL: (
-        "La copia de trabajo ({proxy} caras) es pequeña para un objetivo de {target} quads. "
-        "Usa al menos 3 o 4 veces el objetivo, o activa 'Tamaño automático', para conservar el detalle."),
     texts.GUIDE_LEVELS_IGNORED: (
         "Se ignoraron estos niveles extra (no son un número, no son menores que el nivel anterior, "
         "o son demasiado pequeños): {items}."),
@@ -65,8 +55,8 @@ SPANISH_FROM_TEXTS = {
         "cruce de una a otra. Activa una o más opciones."),
     texts.HELP_SMART_FEATURES: (
         "La detección inteligente analiza cadenas completas de bordes duros en vez de bordes sueltos. Ignora "
-        "bultos pequeños que los quads nunca podrían seguir, conserva las esquinas rectas y ajusta las esquinas "
-        "del resultado sobre las líneas reales de borde de tu modelo para que queden nítidas."),
+        "bultos pequeños que los quads nunca podrían seguir, y conserva las esquinas rectas "
+        "para que queden nítidas."),
     texts.HELP_SYMMETRY: (
         "Usa simetría cuando tu modelo es un espejo de sí mismo. Se remalla la mitad y luego se "
         "espeja, así ambos lados quedan exactamente iguales. Los ejes son los ejes locales del objeto."),
@@ -74,17 +64,10 @@ SPANISH_FROM_TEXTS = {
         "El plano de espejo pasa por el origen del objeto. Si el origen no está en el centro del "
         "modelo, elige 'Centro de la caja envolvente'."),
     texts.HELP_SYMMETRY_SIDE: "La mitad que no conservas se descarta, así que conserva tu mejor lado.",
-    texts.HELP_SPEED: (
-        "Los sculpts pesados se remallan a través de una copia de trabajo más ligera (por ejemplo de 3 millones "
-        "de caras a 80,000), que es mucho más rápida y usa mucha menos memoria. Después el resultado se ajusta "
-        "a tu sculpt original para conservar el detalle. Desactívala solo con mallas ligeras."),
-    texts.HELP_POLISH: (
-        "Cada pasada iguala el tamaño de los quads y los ajusta de nuevo a tu sculpt. Las esquinas y los "
-        "bordes abiertos nunca se mueven. De 2 a 4 pasadas dan un flujo regular y agradable; con 0 solo se ajusta."),
     texts.HELP_LEVELS: (
         "Construye varias versiones de una vez, desde el objetivo de arriba hasta cantidades menores. Escribe "
-        "los niveles extra separados por comas, por ejemplo 15K, 10K, 5K, 4K. Cada nivel se hace a partir del "
-        "anterior y se ajusta a tu sculpt original."),
+        "los niveles extra separados por comas, por ejemplo 15K, 10K, 5K, 4K. Cada nivel se construye "
+        "a partir de tu sculpt original."),
     texts.LABEL_LEVELS_PREVIEW: "Niveles a construir: {levels}",
 
     texts.LABEL_RESULT_FACES: "{faces} caras",
@@ -93,7 +76,6 @@ SPANISH_FROM_TEXTS = {
     texts.LABEL_RESULT_POLES: "{poles} polos (vértices que no son de 4 aristas)",
     texts.LABEL_RESULT_HARD_EDGES: "{count} bordes duros conservados",
     texts.LABEL_RESULT_TIME: "Tiempo: {seconds} s",
-    texts.LABEL_RESULT_CORNERS: "{count} vértices de esquina ajustados a líneas de borde",
     texts.LABEL_RESULT_MEMORY: "Memoria máxima de Blender: {memory} GB",
     texts.LABEL_RESULT_LEVELS: "Todos los niveles",
     texts.LABEL_RESULT_LEVEL_LINE: "{name}: {quads} quads ({percent}%), {poles} polos, {seconds} s",
@@ -106,14 +88,13 @@ SPANISH_FROM_TEXTS = {
     texts.GUIDE_STEP_4: "4. Opcional: abre 'Aislar zonas' para mantener separados materiales, Face Sets o una máscara de sculpt.",
     texts.GUIDE_STEP_5: "5. Opcional: abre 'Simetría' y activa los ejes en los que tu modelo es un espejo. X es lo más común.",
     texts.GUIDE_STEP_6: (
-        "6. Opcional: 'Niveles extra' construye versiones más bajas de una vez (por ejemplo 15K, 10K, 5K, 4K). "
-        "'Velocidad y detalle' controla la copia de trabajo y las pasadas de pulido."),
+        "6. Opcional: 'Niveles extra' construye versiones más bajas de una vez (por ejemplo 15K, 10K, 5K, 4K)."),
     texts.GUIDE_STEP_7: (
         "7. Pulsa 'Remallar'. Tu original se queda (oculto) y aparece un objeto nuevo "
         "llamado '<nombre>_quads' o '<nombre>_tris' (uno por nivel)."),
     texts.LABEL_RESULT_TRI_ONLY: "Malla de triángulos: {tris} triángulos, de tamaño uniforme",
     texts.HELP_ENGINE_FORGE: (
-        "FORGE es el motor propio de QuadForge. Lee el sculpt directamente (sin copia de trabajo), conserva "
+        "FORGE es el motor propio de QuadForge. Lee el sculpt directamente, conserva "
         "bordes duros y bordes abiertos, y puede sacar quads o triángulos. Se ejecuta en un proceso aparte, "
         "así que no puede cerrar Blender."),
     texts.HELP_DENSITY: (
@@ -161,7 +142,6 @@ SPANISH_INTERFACE = {
     "Isolate Zones": "Aislar zonas",
     "Symmetry": "Simetría",
     "Extra Levels": "Niveles extra",
-    "Speed and Detail": "Velocidad y detalle",
     "Last Result": "Último resultado",
     "How to Use": "Cómo usar",
     "Advanced": "Avanzado",
@@ -181,7 +161,6 @@ SPANISH_INTERFACE = {
     "Density Group": "Grupo de densidad",
     "Detail Ratio": "Proporción de detalle",
     "FORGE (QuadForge)": "FORGE (QuadForge)",
-    "QuadriFlow (Blender)": "QuadriFlow (Blender)",
     "Reset Settings": "Restablecer ajustes",
     "Apply Preset": "Aplicar preset",
     "materials": "materiales",
@@ -189,16 +168,10 @@ SPANISH_INTERFACE = {
     "mask": "máscara",
     # property names
     "Target Faces": "Caras objetivo",
-    "Use Working Copy": "Usar copia de trabajo",
-    "Auto Size": "Tamaño automático",
-    "Working Copy Size": "Tamaño de la copia de trabajo",
-    "Keep Sculpt Detail": "Conservar detalle del sculpt",
-    "Polish Passes": "Pasadas de pulido",
     "Keep Hard Edges": "Conservar bordes duros",
     "Smart Detection": "Detección inteligente",
     "Minimum Feature Size": "Tamaño mínimo de detalle",
     "Keep Right Angles": "Conservar ángulos rectos",
-    "Snap Corners to Edges": "Ajustar esquinas a los bordes",
     "Shading": "Sombreado",
     "Smooth with Sharp Edges": "Suave con bordes duros",
     "Smooth": "Suave",
@@ -230,12 +203,11 @@ SPANISH_INTERFACE = {
     "Warn If Not Symmetric": "Avisar si no es simétrico",
     "Clean Mesh First": "Limpiar la malla antes",
     "Hide Original": "Ocultar original",
-    "Seed": "Semilla",
     # property tooltips
     "Approximate number of faces (quads or triangles) you want in the result. The final count can differ by a few percent":
         "Cantidad aproximada de caras (quads o triángulos) que quieres en el resultado. La cantidad final puede variar unos pocos por ciento",
-    "Lower face counts to build as well, separated by commas, for example 15K, 10K, 5K, 4K. Each level is made from the previous one with QuadriFlow and from your source with FORGE":
-        "Cantidades menores de caras que también se construyen, separadas por comas, por ejemplo 15K, 10K, 5K, 4K. Con QuadriFlow cada nivel sale del anterior; con FORGE, de tu fuente",
+    "Lower face counts to build as well, separated by commas, for example 15K, 10K, 5K, 4K. Each level is built from your source mesh":
+        "Cantidades menores de caras que también se construyen, separadas por comas, por ejemplo 15K, 10K, 5K, 4K. Cada nivel se construye a partir de tu malla original",
     "Which remeshing engine does the work": "Qué motor de remallado hace el trabajo",
     "QuadForge's own engine: quads or triangles, fast on heavy meshes, paintable density. Runs as a separate process":
         "El motor propio de QuadForge: quads o triángulos, rápido con mallas pesadas, densidad pintable. Se ejecuta en un proceso aparte",
@@ -247,22 +219,12 @@ SPANISH_INTERFACE = {
         "Vertex group que pide caras más pequeñas donde su peso es alto (solo FORGE). Píntalo en modo Weight Paint en las zonas que necesitan más detalle",
     "How many times shorter the edges are where the group weight is 1 (4 means four times finer, so about 16 times more faces there)":
         "Cuántas veces más cortas son las aristas donde el peso del grupo es 1 (4 significa cuatro veces más fino, unas 16 veces más caras ahí)",
-    "Remesh a lighter copy of heavy sculpts, then snap the result back onto the original. Much faster and uses far less memory":
-        "Remalla una copia más ligera de los sculpts pesados y luego ajusta el resultado al original. Mucho más rápido y usa mucha menos memoria",
-    "Size the working copy at 4 times the largest target (between 40,000 and 600,000 faces)":
-        "Dimensiona la copia de trabajo a 4 veces el mayor objetivo (entre 40,000 y 600,000 caras)",
-    "Faces of the working copy. Use at least 3 to 4 times the target to keep the detail":
-        "Caras de la copia de trabajo. Usa al menos 3 o 4 veces el objetivo para conservar el detalle",
     "Mark Flow Guide": "Marcar guía de flujo",
     "Clear Flow Guides": "Borrar guías de flujo",
     "Flow Guides": "Guías de flujo",
     "Copy UV Maps": "Copiar mapas UV",
     "Copy Face Sets and Mask": "Copiar Face Sets y máscara",
     "Use Flow Guides": "Usar guías de flujo",
-    "Snap the result back onto your original sculpt so it follows every curve and corner":
-        "Ajusta el resultado a tu sculpt original para que siga cada curva y esquina",
-    "How many times to even out the quads and snap them back onto the sculpt. 0 only snaps; 2 to 4 gives a regular flow":
-        "Cuántas veces igualar los quads y ajustarlos de nuevo al sculpt. Con 0 solo se ajusta; de 2 a 4 da un flujo regular",
     "Look at whole chains of sharp edges: ignore tiny bumps, keep right-angle corners":
         "Analiza cadenas completas de bordes duros: ignora bultos pequeños y conserva las esquinas rectas",
     "Chains of sharp edges shorter than this many quad lengths are treated as noise and ignored. Lower keeps small details, higher keeps only long creases":
@@ -316,8 +278,6 @@ SPANISH_INTERFACE = {
         "Copia los mapas UV del original al resultado. Las caras junto a una costura UV antigua son aproximadas; para texturizar al final, hornea desde el original o desenvuelve de nuevo",
     "Copy the sculpt Face Sets (polygroups) and the sculpt mask of the original onto the result, so it goes straight back into Sculpt Mode with the same groups":
         "Copia los Face Sets (polygrupos) y la máscara de escultura del original al resultado, para volver a esculpir con los mismos grupos",
-    "Random seed of the engine. Change it to get a different edge flow":
-        "Semilla aleatoria del motor. Cámbiala para obtener otro flujo de aristas",
 }
 
 

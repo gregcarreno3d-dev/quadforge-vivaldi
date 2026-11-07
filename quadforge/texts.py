@@ -16,16 +16,6 @@ GUIDE_READY = "Ready: '{name}' has {faces} faces and will become about {target} 
 GUIDE_TARGET_NOT_LOWER = (
     "The target ({target}) is not lower than the detail this mesh already has (about {faces} quads), "
     "so the result will not be simpler.")
-GUIDE_HEAVY_MESH = (
-    "This mesh is very dense ({faces} faces) and the working copy is turned off. Remeshing may "
-    "take several minutes and use a lot of memory. Turn on 'Use Working Copy' or decimate it first.")
-GUIDE_USES_PROXY = (
-    "This sculpt is heavy ({faces} faces). QuadForge will first make a lighter working copy of about "
-    "{proxy} faces (faster, much less memory), then snap the result back onto your original sculpt "
-    "to keep the detail.")
-GUIDE_PROXY_SMALL = (
-    "The working copy ({proxy} faces) is small for a target of {target} quads. "
-    "Use at least 3 to 4 times the target, or turn on 'Auto Size', to keep the detail.")
 GUIDE_LEVELS_IGNORED = (
     "These extra levels were ignored (not a number, not lower than the previous level, or too small): {items}.")
 GUIDE_MODIFIERS = "{count} modifier(s) will be included in the result. Your original object is not changed."
@@ -60,8 +50,8 @@ HELP_ZONES = (
     "the other. Turn on one or more options.")
 HELP_SMART_FEATURES = (
     "Smart detection looks at whole chains of sharp edges instead of single edges. It ignores tiny bumps "
-    "that the quads could never follow, keeps right-angle corners, and snaps the corners of the result "
-    "onto the real edge lines of your model so they stay crisp.")
+    "that the quads could never follow, and keeps right-angle corners "
+    "so they stay crisp.")
 HELP_SYMMETRY = (
     "Use symmetry when your model is mirrored. One half is kept and mirrored, "
     "so both sides are exactly identical. Axes are the object's local axes.")
@@ -69,20 +59,13 @@ HELP_SYMMETRY_PLANE = (
     "The mirror plane passes through the object's origin. If the origin is not in the "
     "middle of the model, choose 'Bounding Box Centre'.")
 HELP_SYMMETRY_SIDE = "The half you do not keep is discarded, so keep your best side."
-HELP_SPEED = (
-    "Heavy sculpts are remeshed through a lighter working copy (for example 3 million faces down to "
-    "80,000), which is much faster and uses far less memory. The result is then snapped back onto your "
-    "original sculpt so the detail is kept. Turn it off only for light meshes.")
-HELP_POLISH = (
-    "Each pass evens out the size of the quads and snaps them back onto your sculpt. Corners and open "
-    "borders are never moved. 2 to 4 passes give a pleasant, regular flow; 0 only snaps.")
 HELP_LEVELS = (
     "Build several versions in one go, from the target above down to lower counts. Write the extra "
-    "levels separated by commas, for example 15K, 10K, 5K, 4K. Each level is made from the previous "
-    "one and snapped to your original sculpt.")
+    "levels separated by commas, for example 15K, 10K, 5K, 4K. Every level is built "
+    "from your original sculpt.")
 LABEL_LEVELS_PREVIEW = "Levels to build: {levels}"
 HELP_ENGINE_FORGE = (
-    "FORGE is QuadForge's own engine. It reads the sculpt directly (no working copy needed), keeps hard "
+    "FORGE is QuadForge's own engine. It reads the sculpt directly, keeps hard "
     "edges and open borders, and can output quads or triangles. It runs in a separate process, so it "
     "cannot crash Blender.")
 HELP_CURVATURE = (
@@ -116,7 +99,6 @@ LABEL_RESULT_POLES = "{poles} poles (vertices that are not 4-way)"
 LABEL_RESULT_TRI_ONLY = "Triangle mesh: {tris} triangles, evenly sized"
 LABEL_RESULT_HARD_EDGES = "{count} hard edges kept"
 LABEL_RESULT_TIME = "Time: {seconds} s"
-LABEL_RESULT_CORNERS = "{count} corner vertices snapped onto edge lines"
 LABEL_RESULT_MEMORY = "Peak memory of Blender: {memory} GB"
 LABEL_RESULT_LEVELS = "All levels"
 LABEL_RESULT_LEVEL_LINE = "{name}: {quads} quads ({percent}%), {poles} poles, {seconds} s"
@@ -130,8 +112,7 @@ GUIDE_STEP_3 = "3. Optional: open 'Hard Edges' to keep sharp corners. A lower an
 GUIDE_STEP_4 = "4. Optional: open 'Isolate Zones' to keep materials, Face Sets or a sculpt mask separated."
 GUIDE_STEP_5 = "5. Optional: open 'Symmetry' and enable the axes where your model is mirrored. X is the most common."
 GUIDE_STEP_6 = (
-    "6. Optional: 'Extra Levels' builds lower versions in one go (for example 15K, 10K, 5K, 4K). "
-    "'Speed and Detail' controls the working copy and the polish passes.")
+    "6. Optional: 'Extra Levels' builds lower versions in one go (for example 15K, 10K, 5K, 4K).")
 GUIDE_STEP_7 = (
     "7. Press 'Remesh'. Your original stays (hidden) and a new object named "
     "'<name>_quads' or '<name>_tris' appears (one per level).")

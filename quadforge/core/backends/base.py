@@ -39,7 +39,7 @@ class Backend(ABC):
     def remesh_steps(self, context, obj, request: RemeshRequest):
         """Generator version of ``remesh``: yields while the engine works so the caller can stay responsive.
 
-        The default simply runs ``remesh`` (engines that cannot be interrupted, like QuadriFlow). Closing the
+        The default simply runs ``remesh`` (engines that cannot be interrupted). Closing the
         generator early (user pressed Esc) must stop any process the engine started.
         """
         self.remesh(context, obj, request)

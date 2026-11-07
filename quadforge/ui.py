@@ -6,7 +6,6 @@ Layout, from top to bottom:
       Isolate Zones ........ optional, collapsed
       Symmetry ............. optional, collapsed
       Extra Levels ......... optional, collapsed (build 15K, 10K, 5K ... in one go)
-      Speed and Detail ..... optional, collapsed (working copy, polish)
       Last Result .......... appears after the first run
       How to Use ........... step-by-step guide, collapsed
       Advanced ............. collapsed
@@ -67,7 +66,6 @@ def _level_plan(settings) -> planning.LevelPlan:
 
 def _guidance_options(settings) -> guidance.GuidanceOptions:
     plan = _level_plan(settings)
-    forge = settings.engine == "FORGE"
     return guidance.GuidanceOptions(
         target_quads=settings.target_quads,
         symmetry_axes=tuple(axis for axis, enabled in enumerate((settings.sym_x, settings.sym_y, settings.sym_z)) if enabled),
@@ -76,12 +74,8 @@ def _guidance_options(settings) -> guidance.GuidanceOptions:
         use_face_sets=settings.use_face_sets,
         use_mask=settings.use_mask,
         use_vertex_groups=settings.use_vertex_groups,
-        use_proxy=settings.use_proxy and not forge,
-        proxy_is_auto=settings.proxy_auto,
-        proxy_faces=planning.choose_proxy_faces(plan.largest, settings.proxy_auto, settings.proxy_faces),
         ignored_levels=plan.ignored,
-        output_kind="tris" if forge and settings.output_type == "TRIS" else "quads",
-        handles_heavy_meshes=forge,
+        output_kind="tris" if settings.output_type == "TRIS" else "quads",
     )
 
 
@@ -225,7 +219,6 @@ class QUADFORGE_PT_hard_edges(_QuadForgePanel, bpy.types.Panel):
         smart.prop(settings, "min_feature_size")
         smart.prop(settings, "keep_right_angles")
         draw_wrapped_text(detection, context, translate(texts.HELP_SMART_FEATURES))
-        detection.prop(settings, "snap_features")
         detection.prop(settings, "soft_bevels")
         layout.separator()
         layout.prop(settings, "use_existing_sharp")
@@ -240,7 +233,7 @@ class QUADFORGE_PT_guides(_QuadForgePanel, bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.quadforge.engine == "FORGE"
+        return True
 
     def draw_header(self, context):
         self.layout.prop(context.scene.quadforge, "use_flow_guides", text="")
@@ -342,7 +335,7 @@ class QUADFORGE_PT_density(_QuadForgePanel, bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.quadforge.engine == "FORGE"
+        return True
 
     def draw(self, context):
         layout = self.layout
@@ -371,39 +364,6 @@ class QUADFORGE_PT_density(_QuadForgePanel, bpy.types.Panel):
         layout.separator()
         draw_wrapped_text(layout, context, translate(texts.HELP_CURVATURE))
         layout.prop(settings, "curvature_detail")
-
-
-class QUADFORGE_PT_speed(_QuadForgePanel, bpy.types.Panel):
-    bl_label = "Speed and Detail"
-    bl_parent_id = "QUADFORGE_PT_main"
-    bl_options = {"DEFAULT_CLOSED"}
-
-    @classmethod
-    def poll(cls, context):
-        return context.scene.quadforge.engine != "FORGE"   # FORGE needs no working copy or polish
-
-    def draw(self, context):
-        layout = self.layout
-        _prepare_layout(layout)
-        settings = context.scene.quadforge
-
-        draw_wrapped_text(layout, context, translate(texts.HELP_SPEED))
-        layout.separator()
-        layout.prop(settings, "use_proxy")
-        proxy_options = layout.column()
-        proxy_options.active = settings.use_proxy
-        proxy_options.prop(settings, "proxy_auto")
-        manual_size = proxy_options.column()
-        manual_size.active = not settings.proxy_auto
-        manual_size.prop(settings, "proxy_faces")
-
-        layout.separator()
-        layout.prop(settings, "use_reproject")
-        layout.prop(settings, "subdivision_match")
-        polish = layout.column()
-        polish.active = settings.use_reproject
-        polish.prop(settings, "polish_passes")
-        draw_wrapped_text(polish, context, translate(texts.HELP_POLISH))
 
 
 # --------------------------------------------------------------------------- result and help
@@ -437,9 +397,6 @@ class QUADFORGE_PT_last_result(_QuadForgePanel, bpy.types.Panel):
                          icon="BLANK1", translate=False)
         column.label(text=say(texts.LABEL_RESULT_HARD_EDGES, count=f"{settings.last_hard_edges:,}"),
                      icon="BLANK1", translate=False)
-        if settings.last_corners_snapped:
-            column.label(text=say(texts.LABEL_RESULT_CORNERS, count=f"{settings.last_corners_snapped:,}"),
-                         icon="BLANK1", translate=False)
         column.label(text=say(texts.LABEL_RESULT_TIME, seconds=f"{settings.last_seconds:.1f}"),
                      icon="TIME", translate=False)
         if settings.last_peak_memory_gb > 0.0:
@@ -505,7 +462,5 @@ class QUADFORGE_PT_advanced(_QuadForgePanel, bpy.types.Panel):
         layout.prop(settings, "hide_original")
         layout.prop(settings, "transfer_uvs")
         layout.prop(settings, "transfer_zones")
-        if settings.engine != "FORGE":
-            layout.prop(settings, "seed")
         layout.separator()
         layout.operator("quadforge.reset_settings", icon="LOOP_BACK")

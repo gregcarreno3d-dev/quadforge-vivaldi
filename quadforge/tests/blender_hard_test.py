@@ -21,7 +21,7 @@ bev = obj.modifiers.new("bv", "BEVEL"); bev.width = 0.03; bev.segments = 2; bev.
 bpy.ops.object.modifier_apply(modifier="bv")
 bm = bmesh.new(); bm.from_mesh(obj.data); bmesh.ops.triangulate(bm, faces=bm.faces[:]); bm.to_mesh(obj.data); bm.free()
 
-s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = "QUADS"; s.target_quads = 4000; s.hide_original = False
+s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = 4000; s.hide_original = False
 s.use_sharp_angle = True; s.sharp_angle_degrees = 30.0; s.curvature_detail = "OFF"
 r = M.pipeline.run(bpy.context, obj, s)
 me = r.levels[0].object.data; st = r.levels[0].stats

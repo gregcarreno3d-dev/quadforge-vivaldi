@@ -1,4 +1,4 @@
-# Status and limits — QuadForge Vivaldi 0.13.1
+# Status and limits — QuadForge Vivaldi 0.14.0
 
 ## Tested
 - FORGE engine (Linux): sphere, torus, box with 12 exact hard edges, hemisphere with border, cylinder, density (length ratio 2.99 vs 3 requested), meshes with defects, 120 random cases with no failures, 1.3 M tris → 40 K in ~7 s (peak ~390 MB).
@@ -6,11 +6,11 @@
 - Windows and macOS binaries compiled with Zig; **not executed**.
 
 ## Tested inside Blender (5.2.2, `bpy` module, headless)
-- 28 original scenarios + 10 FORGE scenarios (`tests/blender_integration_test.py`, `tests/blender_forge_test.py`): pipeline, symmetry, levels, zones, density vertex group, quads/triangles output, QuadriFlow route, operator, cancel (engine process stops, no leftovers), and installation of the real extension zip.
+- 28 original scenarios + 10 FORGE scenarios (`tests/blender_integration_test.py`, `tests/blender_forge_test.py`): pipeline, symmetry, levels, zones, density vertex group, quads/triangles output, operator, cancel (engine process stops, no leftovers), and installation of the real extension zip.
 - Models by the author: hand (119K tris), bull ant with peg (119K), hard-surface plate (8K, 4 through holes): all produce valid, closed, consistently oriented meshes.
 
 ## Measured: FORGE vs QuadriFlow (2 CPU cores)
-Target 4000 quads (`devtools/compare_engines.py` for QuadriFlow):
+Target 4000 quads (historical comparison with Blender's QuadriFlow, which is no longer part of the add-on):
 | Model | Engine (method) | Poles / 1000 quads | Regular vertices | Time |
 |---|---|---|---|---|
 | Bull ant | FORGE 0.7 (integer grid) | 40 | 96 % | 2.3 s |
@@ -82,8 +82,7 @@ Open borders: the engine closes every border loop with a cap, treats the loop as
 - Cells thinner than the quad size (very thin legs, antennae) can come out ragged or open.
 - Hard-surface models with density groups on a smooth shape with very few singularities may fall back to the older pairing path (~60–80 poles/1000 quads). Caps of non-convex or very deep holes can intersect the model; then the engine falls back to pairing.
 - **Finger tips, 120 000+ quads (improved in 0.10.13)**: where the parametrization stretches the grid (3–5× at thin tips) the isotropic mesh had fewer vertices than lattice points, so some cells were lost and filled with irregular patches. 0.10.13 subdivides stretched triangles virtually before extracting cells (hand at 118K: poles 280 → ~60, holes 13 → 5). A few holes can remain in the thinnest tips; they are filled and the result stays valid. Debug switch: `FORGE_NOSUBDIV=1`.
-- Large counts take tens of seconds (a plain conjugate-gradient solver); QuadriFlow is slower still.
-- QuadriFlow route cannot be cancelled (Blender's operator is blocking); FORGE can (Esc).
+- Large counts take tens of seconds (a plain conjugate-gradient solver). Remeshing can be cancelled with Esc.
 - No guide curves and no directly painted density (vertex group only). Detail by Zone gives about 1.7 times more faces for a factor of 2, not 4: the engine changes density gradually to keep clean quads.
 - Subdivision Match is made for smooth shapes: near sharp creases points can move up to a third of an edge; triangles and n-gons are skipped.
 - Flow guides on closed loops (around an eye) raise the share of quad rows that follow the loop only modestly on a synthetic head (62–70 %); real heads are still needed to tune this.

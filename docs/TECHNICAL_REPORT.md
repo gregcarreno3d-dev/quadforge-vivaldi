@@ -1,6 +1,6 @@
 # FORGE: field-aligned integer-grid quad remeshing inside Blender
 
-**Technical report for QuadForge Vivaldi 0.13.1** · GPL-3.0-or-later · November 2026
+**Technical report for QuadForge Vivaldi 0.14.0** · GPL-3.0-or-later · November 2026
 
 > **What this document is.** A description of how the QuadForge add-on and its FORGE engine turn an arbitrary triangle or
 > polygon mesh into a clean quad mesh. It is a **technical report, not a peer-reviewed paper**. FORGE does not claim a new
@@ -493,8 +493,7 @@ python3 quadforge/tests/blender_integration_test.py
 
 The continuous-integration workflow (`.github/workflows/ci.yml`) builds the engine for Windows, Linux and macOS (Intel
 and Apple Silicon) with Zig and runs the engine tests on each; a separate job runs the add-on tests inside Blender.
-Quality metrics of any result: `python3 tools/quality_metrics.py result.fmesh --source model.stl`. A comparison with
-QuadriFlow inside Blender is in `quadforge/devtools/compare_engines.py`, and the timing benchmark in
+Quality metrics of any result: `python3 tools/quality_metrics.py result.fmesh --source model.stl`. The old QuadriFlow comparison script was removed in 0.14 together with the QuadriFlow route; the timing benchmark is in
 `quadforge/tests/benchmark.py`.
 
 ## 11. References

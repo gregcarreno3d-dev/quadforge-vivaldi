@@ -39,22 +39,6 @@ def test_invalid_duplicate_and_too_high_levels_are_ignored():
     assert set(plan.ignored) == {"abc", "10K", "12000", "5000", "8"}
 
 
-def test_proxy_size_auto_follows_four_times_the_target_with_limits():
-    assert planning.choose_proxy_faces(20000, True, 1) == 80000
-    assert planning.choose_proxy_faces(2000, True, 1) == planning.PROXY_MIN_FACES
-    assert planning.choose_proxy_faces(500000, True, 1) == planning.PROXY_MAX_FACES
-
-
-def test_proxy_size_manual_is_respected():
-    assert planning.choose_proxy_faces(20000, False, 123456) == 123456
-
-
-def test_needs_proxy_only_for_clearly_heavier_sources():
-    assert planning.needs_proxy(3_000_000, 80_000)
-    assert not planning.needs_proxy(100_000, 80_000)          # less than 1.5 x
-    assert not planning.needs_proxy(3_000_000, 80_000, use_proxy=False)
-
-
 def test_format_target_for_object_names():
     assert planning.format_target(20000) == "20K"
     assert planning.format_target(4000) == "4K"

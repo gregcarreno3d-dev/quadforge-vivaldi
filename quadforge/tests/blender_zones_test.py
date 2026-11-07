@@ -30,7 +30,7 @@ def make_sphere():
     return obj, mat
 
 def run(obj, output="QUADS", **kw):
-    s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = output; s.target_quads = kw.pop('target', 3000)
+    s = M.pipeline.RemeshSettings(); s.output = output; s.target_quads = kw.pop('target', 3000)
     s.hide_original = False; s.use_sharp_angle = False; s.use_materials = True
     for k, v in kw.items():
         setattr(s, k, v)

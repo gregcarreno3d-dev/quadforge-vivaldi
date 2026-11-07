@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0 - 2026-11-07
+
+New
+- **Badly shaped quads are relaxed and projected back on the surface.** After the engine, only the vertices of quads with a very sharp or flat corner (corner sine below 0.55) are smoothed, then projected onto your source. Boundary and hard-edge vertices never move, and any move that makes a quad worse or folds it is reverted. On the cylinder test at 20,000 faces the skewed quads fell from 486 to 356 with the surface deviation unchanged.
+
+Changed
+- **QuadriFlow is gone from the add-on.** QuadForge now runs only on its own FORGE engine. Removed: the QuadriFlow backend and the `QUADFORGE_LEGACY_ENGINE` switch, the working copy, reprojection, polish passes, seed and corner-snapping settings, the *Speed and Detail* panel and their texts and tests. Old scenes that still store these values simply ignore them.
+- Very dense meshes only ask for confirmation above 6 million faces (FORGE reads dense sculpts directly).
+
 ## 0.13.1 - 2026-11-07
 
 Fixed

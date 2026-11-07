@@ -5,30 +5,24 @@ a short function above it that does exactly one job.
 
     1. read the source             modifiers applied, original untouched, BVH tree of the surface
     2. zone labels                 materials / Face Sets / mask -> one label per face
-    3. working copy (proxy)        heavy sculpts are decimated to a light copy (e.g. 3M -> 80K faces)
-    4. symmetry plan               which planes, which halves to keep
-    5. clean and cut               only the kept half goes to the engine
-    6. for every level (20K, 15K, 10K ...):
+    3. symmetry plan               which planes, which halves to keep
+    4. clean and cut               only the kept half goes to the engine
+    5. for every level (20K, 15K, 10K ...):
          a. mark hard edges and zone borders   (the constraints the engine must respect)
-         b. remesh with the engine             (QuadriFlow, through the backend interface)
+         b. remesh with the engine             (FORGE, through the backend interface; it projects onto the source itself)
          c. restore materials and zone labels (the engine drops them)
-         d. snap corners                       (corner vertices go exactly onto the model's edge lines)
-         e. polish                             (relax the quads, snap back onto the ORIGINAL sculpt)
-         f. the polished half becomes the input of the next, lower level
-    7. mirror and weld each level  exact symmetry
-    8. create the result objects   same transform as the original
-    9. quality warnings
+         d. relax badly shaped quads           (moved vertices go back onto the ORIGINAL surface)
+    6. mirror and weld each level  exact symmetry
+    7. create the result objects   same transform as the original
+    8. quality warnings
 
-Why this is faster and lighter than remeshing the sculpt directly: the engine only
-ever sees an 80K-face half (or less) instead of millions of faces, and lower levels
-start from a 20K quad mesh instead of the sculpt. Why it keeps the detail: every
-level is snapped onto the ORIGINAL surface at the end (stage 6d).
+Every level starts from the source (not from the previous level), so a lower level is as faithful as the first.
 
 Stability rules:
   * the original object is never modified;
   * every temporary Blender datablock is deleted when ``run()`` ends, even after an error;
   * bulk work is done with NumPy arrays (see ``geometry`` / ``mesh_io``), not Python loops;
-  * optional steps (snap, polish, zone transfer) warn and continue instead of failing.
+  * optional steps (relaxation, zone transfer, UV copy) warn and continue instead of failing.
 """
 from __future__ import annotations
 
@@ -71,10 +65,7 @@ THIN_BAND_MIN_LENGTH = 12.0              # only long strips (rims, chamfer rings
 THIN_BAND_REACH = 3.0                     # bands between hard edges narrower than this many quad lengths get finer faces
 TARGET_MISS_WARNING_FRACTION = 0.15       # warn if the quad count is 15% away from the target
 SYMMETRY_MATCH_WARNING_THRESHOLD = 0.9    # warn if fewer than 90% of sampled points match
-MIN_DECIMATE_RATIO = 0.001
 WORK_OBJECT_NAME = "QuadForge_work"
-PROXY_OBJECT_NAME = "QuadForge_proxy"
-DECIMATE_MODIFIER_NAME = "QuadForge_Decimate"
 DENSITY_ATTRIBUTE = "quadforge_density"
 CURVATURE_ANGLES = {"OFF": 0.0, "LOW": 0.35, "MEDIUM": 0.22, "HIGH": 0.15}   # radians a face edge may turn the surface
 
@@ -91,21 +82,13 @@ class RemeshSettings:
 
     target_quads: int = 4000
     extra_levels: str = ""          # e.g. "15K, 10K, 5K, 4K"
-    backend: str = "FORGE"          # FORGE (own engine) | QUADRIFLOW (Blender's)
-    output: str = "QUADS"           # QUADS | TRIS (FORGE only; QuadriFlow always makes quads)
+    output: str = "QUADS"           # QUADS | TRIS
     density_group: str = ""         # vertex group that asks FORGE for finer faces (weight 1 = finest)
     density_ratio: float = 4.0      # how many times shorter the edges are where the weight is 1
     subdivision_match: bool = False  # move the control points so the Subdivision Surface limit lies on the source
     zone_factors: dict = dataclasses.field(default_factory=dict)  # zone name -> detail multiplier (2 = twice as fine)
     use_flow_guides: bool = True    # edges marked with Mark Flow Guide pull the quad rows along them (soft hint)
     curvature_detail: str = "OFF"   # OFF | LOW | MEDIUM | HIGH: smaller faces on strongly curved areas (eyes, lips, ear rims)
-
-    # speed and detail
-    use_proxy: bool = True
-    proxy_auto: bool = True
-    proxy_faces: int = 80_000
-    use_reproject: bool = True
-    polish_passes: int = 3
 
     # hard edges
     use_sharp_angle: bool = True
@@ -118,7 +101,6 @@ class RemeshSettings:
     smart_features: bool = True      # judge whole chains of sharp edges, not single edges
     min_feature_size: float = 2.0    # chains shorter than this many quad lengths are noise
     keep_right_angles: bool = True
-    snap_features: bool = True       # put corner vertices exactly on the edge lines
     preserve_boundary: bool = True
 
     # zone isolation
@@ -164,8 +146,6 @@ class RemeshResult:
     warnings: list = field(default_factory=list)
     profile: dict = field(default_factory=dict)   # see profiling.Profiler.as_dict()
     source_faces: int = 0
-    proxy_faces_used: Optional[int] = None        # None when no working copy was needed
-    corners_snapped: int = 0                      # corner vertices moved onto the edge lines (all levels)
 
     # Shortcuts to the first (largest) level, which is what most callers want.
     @property
@@ -244,7 +224,7 @@ def _bounding_box_diagonal(evaluated_object) -> float:
 def _wants_surface_tree(settings: RemeshSettings, uses_zones: bool) -> bool:
     """The BVH tree costs time and memory, so only build it when something will use it."""
     symmetry_check = settings.check_symmetry and (settings.sym_x or settings.sym_y or settings.sym_z)
-    return settings.use_reproject or symmetry_check or uses_zones or settings.subdivision_match or settings.relax_quads
+    return symmetry_check or uses_zones or settings.subdivision_match or settings.relax_quads
 
 
 def _read_source(context, original, settings: RemeshSettings, uses_zones: bool,
@@ -268,7 +248,7 @@ def _read_source(context, original, settings: RemeshSettings, uses_zones: bool,
             info.surface_tree = BVHTree.FromObject(evaluated_object, depsgraph)  # object (local) space
         except Exception as error:  # noqa: BLE001
             warnings.append(f"Could not build the surface tree ({error!r}). "
-                            f"Snapping to the sculpt and the symmetry check are skipped.")
+                            f"Relaxing the quads and the symmetry check are skipped.")
     return info, mesh
 
 
@@ -452,45 +432,11 @@ def _compute_zone_labels(mesh, original, settings: RemeshSettings, warnings: lis
 
 # --------------------------------------------------------------------------- stage 3
 
-def _decimate_to_proxy(context, mesh, proxy_faces: int, settings: RemeshSettings,
-                       warnings: list) -> bool:
-    """Reduce ``mesh`` in place to about ``proxy_faces`` triangles. Returns True if it did."""
-    triangle_count = len(mesh.loop_triangles)
-    if not planning.needs_proxy(triangle_count, proxy_faces, settings.use_proxy):
-        return False
-
-    proxy_object = bpy.data.objects.new(PROXY_OBJECT_NAME, mesh)
-    context.scene.collection.objects.link(proxy_object)
-    try:
-        modifier = proxy_object.modifiers.new(DECIMATE_MODIFIER_NAME, "DECIMATE")
-        modifier.decimate_type = "COLLAPSE"
-        modifier.ratio = max(MIN_DECIMATE_RATIO, min(1.0, proxy_faces / triangle_count))
-        modifier.use_collapse_triangulate = True
-        with context.temp_override(object=proxy_object, active_object=proxy_object,
-                                   selected_objects=[proxy_object],
-                                   selected_editable_objects=[proxy_object]):
-            bpy.ops.object.modifier_apply(modifier=modifier.name)
-        return True
-    except RuntimeError as error:
-        warnings.append(f"The working copy could not be created ({error}). "
-                        f"The full mesh will be remeshed instead, which is slower.")
-        return False
-    finally:
-        bpy.data.objects.remove(proxy_object, do_unlink=True)  # the mesh data stays
-
-
-def _attach_zone_labels(mesh, labels, source: SourceInfo, was_decimated: bool, warnings: list) -> None:
-    """Store the zone labels on the (possibly decimated) mesh as a face attribute."""
-    if labels is None:
-        return
-    if not was_decimated:
+def _attach_zone_labels(mesh, labels) -> None:
+    """Store the zone labels on the mesh as a face attribute."""
+    if labels is not None:
         mio.write_int_face_attribute(mesh, detail.ZONE_ATTRIBUTE, labels)
-        return
-    if source.surface_tree is None or not detail.transfer_zone_labels(source.surface_tree, labels, mesh):
-        warnings.append("Zones could not be carried onto the working copy, so they are ignored.")
 
-
-# --------------------------------------------------------------------------- stage 4
 
 def _plan_symmetry(proxy_arrays: geo.MeshArrays, source: SourceInfo, settings: RemeshSettings,
                    warnings: list) -> sym.SymmetryPlan:
@@ -725,7 +671,7 @@ def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshS
     context.scene.collection.objects.link(work_object)
     try:
         try:
-            yield from get_backend(settings.backend).remesh_steps(context, work_object, request)
+            yield from get_backend().remesh_steps(context, work_object, request)
             if (fallback_density is not None and keep_input is not None and settings.output == "QUADS"
                     and (request.engine_info or {}).get("method") == "pair"):
                 # the grid method gave up with the strong refinement of thin strips: run again with the gentler one
@@ -738,7 +684,7 @@ def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshS
                     keep_input = keep_input.copy()
                     if discarded is not mesh and discarded.users == 0:
                         bpy.data.meshes.remove(discarded)
-                    yield from get_backend(settings.backend).remesh_steps(context, work_object, request)
+                    yield from get_backend().remesh_steps(context, work_object, request)
             if keep_input is not None:
                 vanished = _collapse_slivers(work_object.data)
                 if vanished > SLIVER_RETARGET_FRACTION:
@@ -747,7 +693,7 @@ def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshS
                                                  engine_info={})
                     work_object.data = keep_input
                     keep_input = None
-                    yield from get_backend(settings.backend).remesh_steps(context, work_object, bigger)
+                    yield from get_backend().remesh_steps(context, work_object, bigger)
                     _collapse_slivers(work_object.data)
                     request.engine_info.clear()
                     request.engine_info.update(bigger.engine_info)
@@ -1097,14 +1043,6 @@ def run_steps(context, original, settings: RemeshSettings,
     uses_zones = ((settings.use_materials and len(original.material_slots) > 1)
                   or settings.use_face_sets or settings.use_mask or settings.use_vertex_groups)
 
-    forge = settings.backend == "FORGE"
-    if forge:
-        # FORGE handles any density by itself and projects onto the source, so the working copy,
-        # the corner snap and the polish of the QuadriFlow route are not needed (and would only cost time).
-        settings = dataclasses.replace(settings, use_proxy=False, use_reproject=False,
-                                       snap_features=False, polish_passes=0)
-    else:
-        settings = dataclasses.replace(settings, output="QUADS")
     kind = "tris" if settings.output == "TRIS" else "quads"
 
     with TemporaryData() as temp:
@@ -1122,15 +1060,8 @@ def run_steps(context, original, settings: RemeshSettings,
             zone_labels = _compute_zone_labels(mesh, original, settings, warnings) if uses_zones else None
             zone_names = _zone_names(mesh, original, settings, zone_labels) if zone_labels is not None else {}
 
-        if forge:
-            _attach_density(mesh, original, settings, warnings, zone_labels, zone_names)
-
-        progress(20, "Making the working copy")
-        yield
-        proxy_faces = planning.choose_proxy_faces(level_plan.largest, settings.proxy_auto, settings.proxy_faces)
-        with profiler.stage("Working copy"):
-            was_decimated = _decimate_to_proxy(context, mesh, proxy_faces, settings, warnings)
-            _attach_zone_labels(mesh, zone_labels, source, was_decimated, warnings)
+        _attach_density(mesh, original, settings, warnings, zone_labels, zone_names)
+        _attach_zone_labels(mesh, zone_labels)
 
         progress(30, "Planning symmetry")
         yield
@@ -1138,7 +1069,7 @@ def run_steps(context, original, settings: RemeshSettings,
             proxy_arrays = mio.read_mesh_arrays(mesh)
             proxy_stats = geo.mesh_stats(proxy_arrays)
             plan = _plan_symmetry(proxy_arrays, source, settings, warnings)
-            if forge and settings.output == "QUADS" and plan.is_active \
+            if settings.output == "QUADS" and plan.is_active \
                     and not os.environ.get("FORGE_HALF_FIRST"):
                 # closed model: remesh the whole thing with the planes as guide lines and cut afterwards
                 # (a flat cap on the cut disturbs the engine; this keeps the surface natural at the seam)
@@ -1149,20 +1080,17 @@ def run_steps(context, original, settings: RemeshSettings,
         with profiler.stage("Clean and cut"):
             level_input = _clean_and_cut_to_half(mesh, plan, settings, source.diagonal, temp)
 
-        base_input = temp.track_mesh(level_input.copy()) if forge else None   # FORGE: every level starts from the source
+        base_input = temp.track_mesh(level_input.copy())   # every level starts from the source
         zone_report = []       # (level label, zone labels that made it into the result)
-        finished_halves = []   # (target, polished half mesh, hard edge count, seconds)
+        finished_halves = []   # (target, half mesh, hard edge count, seconds)
         snap_angle = settings.sharp_angle_deg if settings.use_sharp_angle else None
         keep_face_data = len(original.material_slots) > 1 or zone_labels is not None
-        feature_lines = None   # hard-edge lines of the model, found once and reused by every level
-        corners_snapped = 0
         for index, target in enumerate(level_plan.targets):
             label = planning.format_target(target)
             progress(40 + int(50 * index / len(level_plan.targets)), f"Remeshing {label}")
             yield
             level_started = time.perf_counter()
-            if forge:
-                level_input = temp.track_mesh(base_input.copy())
+            level_input = temp.track_mesh(base_input.copy())
             span_start = 40 + int(50 * index / len(level_plan.targets))
             span = 50 / len(level_plan.targets)
 
@@ -1171,11 +1099,9 @@ def run_steps(context, original, settings: RemeshSettings,
             quads_for_piece = max(MIN_FACES_PER_PIECE, round(target / plan.engine_pieces))
             with profiler.stage(f"Level {label}: constraints"):
                 constraints = _mark_hard_edges_and_zones(level_input, settings, quads_for_piece, warnings, plan)
-                if feature_lines is None:
-                    feature_lines = constraints.feature_segments
                 reference_mesh = temp.track_mesh(level_input.copy()) if keep_face_data else None
             with profiler.stage(f"Level {label}: engine"):
-                guides = collect_guides(mesh, plan) if (forge and settings.use_flow_guides and settings.output == "QUADS") else None
+                guides = collect_guides(mesh, plan) if (settings.use_flow_guides and settings.output == "QUADS") else None
                 half_mesh = yield from _remesh_with_engine(context, level_input, plan, settings, target,
                                                 constraints.hard_edge_count, temp, engine_progress, warnings, guides,
                                                 constraints.fallback_density)
@@ -1187,21 +1113,11 @@ def run_steps(context, original, settings: RemeshSettings,
                     found_labels = detail.copy_face_data(reference_mesh, half_mesh)
                 if found_labels is not None and not plan.is_active:
                     zone_report.append((label, set(np.unique(found_labels).tolist())))
-            if settings.snap_features and snap_angle is not None and feature_lines is not None:
-                with profiler.stage(f"Level {label}: corners"):
-                    corners_snapped += detail.snap_corners_to_feature_lines(
-                        half_mesh, feature_lines, snap_angle, constraints.quad_length, plan)
-            if settings.use_reproject and source.surface_tree is not None:
-                with profiler.stage(f"Level {label}: polish and snap"):
-                    detail.polish_mesh(half_mesh, source.surface_tree, plan, snap_angle,
-                                       settings.polish_passes)
             if settings.relax_quads and settings.output == "QUADS" and source.surface_tree is not None:
                 with profiler.stage(f"Level {label}: relax bad quads"):
                     detail.relax_bad_quads(half_mesh, source.surface_tree, snap_angle, RELAX_PASSES)
             finished_halves.append((target, half_mesh, constraints.hard_edge_count,
                                     time.perf_counter() - level_started))
-            if index + 1 < len(level_plan.targets) and not forge:
-                level_input = temp.track_mesh(half_mesh.copy())   # the next, lower level starts here
 
         warnings.extend(_lost_zone_warnings(zone_labels, zone_names, zone_report, several_levels))
         progress(92, "Building the results")
@@ -1250,6 +1166,4 @@ def run_steps(context, original, settings: RemeshSettings,
             warnings=warnings,
             profile=profiler.as_dict(),
             source_faces=source.face_count,
-            proxy_faces_used=proxy_faces if was_decimated else None,
-            corners_snapped=corners_snapped,
         )

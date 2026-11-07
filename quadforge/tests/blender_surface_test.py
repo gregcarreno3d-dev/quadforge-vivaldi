@@ -21,15 +21,12 @@ check(bpy.ops.quadforge.set_surface(surface="ORGANIC") == {"FINISHED"}, "organic
 check(s.surface_type == "ORGANIC" and not s.use_sharp_angle and s.curvature_detail == "MEDIUM", "organic: hard edges off, Detail on Curves Medium")
 check(bpy.ops.quadforge.set_surface(surface="HARD") == {"FINISHED"}, "hard surface button runs")
 check(s.surface_type == "HARD" and s.use_sharp_angle and abs(math.degrees(s.sharp_angle) - 30.0) < 0.01
-      and s.curvature_detail == "OFF" and s.snap_features and s.keep_right_angles, "hard surface: edges from 30 degrees, Detail off, snapping on")
+      and s.curvature_detail == "OFF" and s.keep_right_angles, "hard surface: edges from 30 degrees, Detail off")
 check(bpy.ops.quadforge.set_surface(surface="NOPE") == {"CANCELLED"}, "unknown surface is refused")
 
-s.sym_x = True; s.output_type = "TRIS"; s.backend = "FORGE"; s.use_materials = True
+s.sym_x = True; s.output_type = "TRIS"; s.use_materials = True
 bpy.ops.quadforge.set_surface(surface="ORGANIC")
-s.backend = "QUADRIFLOW"
-check(s.engine == "FORGE" and s.to_settings().backend == "FORGE", "an old scene that stored QuadriFlow still runs FORGE")
-s.backend = "FORGE"
-check(s.sym_x and s.output_type == "TRIS" and s.backend == "FORGE" and s.use_materials, "buttons leave symmetry, zones, output and engine alone")
+check(s.sym_x and s.output_type == "TRIS" and s.use_materials, "buttons leave symmetry, zones and output alone")
 
 check(s.surface_type == "ORGANIC", "button still marked after the profile wrote its values")
 s.curvature_detail = "HIGH"

@@ -12,7 +12,7 @@ src_loops = len(obj.data.loops)
 assert len(obj.data.uv_layers) == 1
 
 def run(output, transfer=True, sym=False):
-    s = M.pipeline.RemeshSettings(); s.backend = "FORGE"; s.output = output; s.target_quads = 4000
+    s = M.pipeline.RemeshSettings(); s.output = output; s.target_quads = 4000
     s.hide_original = False; s.transfer_uvs = transfer; s.use_sharp_angle = False; s.sym_x = sym
     r = M.pipeline.run(bpy.context, obj, s)
     return r.levels[0].object

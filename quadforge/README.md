@@ -1,4 +1,4 @@
-# QuadForge Vivaldi 0.13.1
+# QuadForge Vivaldi 0.14.0
 
 > The FORGE engine is validated in Blender 5.2 on Linux; the Windows and macOS binaries are built but not yet widely tested.
 
@@ -8,10 +8,9 @@ Quad remesher for heavy sculpts: you set a target count (and, if you want, a lad
 quad meshes that fit your sculpt.
 
 - **Count target** (ZRemesher style): `4000` → roughly 4000 quads.
-- **Level ladder**: `20K` plus `15K, 10K, 5K, 4K` in a single run, each level built from the previous one.
-- **Multi-million-face sculpts**: uses a lightweight *working copy* (for example 3 M → 80 K) and then **fits each level
-  to your original sculpt** to preserve the shape.
-- **Polish** of quads (more regular sizes) without moving corners or the symmetry seam.
+- **Level ladder**: `20K` plus `15K, 10K, 5K, 4K` in a single run, each level built from your source.
+- **Multi-million-face sculpts**: FORGE reads dense sculpts directly and projects every level onto your original.
+- **Relaxation** of badly shaped quads, projected back on the surface, without moving corners or the symmetry seam.
 - **Smart hard edges**: analyzes edge chains, ignores noise smaller than two quads, keeps straight corners and
   snaps the result's corners exactly onto the model's edge lines.
 - **Isolate zones** by materials, Face Sets or mask.
@@ -23,7 +22,7 @@ quad meshes that fit your sculpt.
 
 ## Installation
 
-Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose `quadforge-vivaldi-0.13.1-all-platforms.zip`.
+Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose `quadforge-vivaldi-0.14.0-all-platforms.zip`.
 The panel appears in the 3D Viewport, sidebar (**N** key), **QuadForge** tab.
 
 ## Usage in 3 steps
@@ -54,7 +53,7 @@ core/             the "engine room"
   symmetry.py       cutting, mirroring, seam welding and face orientation
   detail.py         sculpt fitting, corner snapping, polish, face data
   profiling.py      time and memory
-  backends/         engines behind a single interface (today: QuadriFlow)
+  backends/         engines behind a single interface (today: FORGE)
   pipeline.py       the 9-stage remeshing recipe (starts at the run() function)
 tests/            tests and benchmark
 ```

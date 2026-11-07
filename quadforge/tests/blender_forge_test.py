@@ -180,14 +180,6 @@ def t_levels_forge():
         assert lv.stats["non_manifold_edges"] == 0
 
 
-def t_quadriflow_still_works():
-    reset()
-    o = sphere()
-    r, secs = run(o, target_quads=800, backend="QUADRIFLOW", hide_original=False)
-    valid(r)
-    row("sphere QuadriFlow", r, secs)
-
-
 def t_cancel_stops_engine_and_cleans_up():
     import subprocess
     reset()
@@ -253,7 +245,7 @@ def t_models():
 if __name__ == "__main__":
     reset()
     for fn in (t_tris_and_quads, t_density_group, t_missing_group_warns, t_symmetry_forge, t_symmetry_cut_after_forge, t_levels_forge,
-               t_quadriflow_still_works, t_cancel_stops_engine_and_cleans_up, t_operator, t_models):
+               t_cancel_stops_engine_and_cleans_up, t_operator, t_models):
         check(fn.__name__, fn)
     print("\nALL PASSED" if not FAILS else f"\nFAILED: {FAILS}")
     sys.exit(1 if FAILS else 0)

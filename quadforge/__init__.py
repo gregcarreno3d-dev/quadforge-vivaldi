@@ -6,7 +6,7 @@ Map of the package (read in this order to understand it):
     texts.py        every sentence the user reads (English)
     translations.py Spanish version of those sentences
     presets.py      one-click starting points (Prop, Character, Ladder 20K to 4K ...)
-    planning.py     pure rules: which levels to build, how big the working copy is
+    planning.py     pure rules: which levels to build, which levels to build
     guidance.py     rules that produce the live advice (pure Python)
     properties.py   the settings stored in the scene
     operators.py    the buttons (Remesh, Apply Preset, Reset)
@@ -16,9 +16,9 @@ Map of the package (read in this order to understand it):
         mesh_io.py      fast Blender <-> NumPy transfer
         symmetry.py     cut, mirror, weld the seam and fix the face orientation
         features.py     smart hard-edge detection (chains, quad-size filter, right angles)
-        detail.py       snap to the original sculpt, snap corners to edge lines, polish, carry zones
+        detail.py       relax badly shaped quads and project them back
         profiling.py    time per stage and memory of the Blender process
-        backends/       remesh engines behind one interface (FORGE = own engine, QuadriFlow)
+        backends/       remesh engines behind one interface (FORGE, the own engine)
         pipeline.py     the remesh recipe: stages from "read mesh" to "result objects"
 """
 import bpy
@@ -47,7 +47,6 @@ from .ui import (
     QUADFORGE_PT_last_result,
     QUADFORGE_PT_levels,
     QUADFORGE_PT_main,
-    QUADFORGE_PT_speed,
     QUADFORGE_PT_symmetry,
     QUADFORGE_PT_zones,
 )
@@ -74,7 +73,6 @@ _CLASSES = (
     QUADFORGE_PT_symmetry,
     QUADFORGE_PT_levels,
     QUADFORGE_PT_density,
-    QUADFORGE_PT_speed,
     QUADFORGE_PT_last_result,
     QUADFORGE_PT_how_to_use,
     QUADFORGE_PT_advanced,
