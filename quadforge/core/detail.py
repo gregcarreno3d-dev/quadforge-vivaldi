@@ -91,6 +91,81 @@ def polish_mesh(mesh, surface_tree, plan: sym.SymmetryPlan, sharp_angle_degrees,
         snap_vertices_to_surface(mesh, surface_tree, plan)
 
 
+BAD_QUAD_SINE = 0.55        # a quad whose sharpest corner has a smaller sine (about 33 degrees off square) is relaxed
+RELAX_BAD_STRENGTH = 0.6
+RELAX_BAD_MAX_MOVE_EDGES = 1.0   # a vertex moves at most one local edge length per pass
+
+
+def quad_corner_sines(arrays) -> tuple[np.ndarray, np.ndarray]:
+    """``(quad polygon indices, smallest corner sine of each quad)``; 1 is a square, 0 is flat or folded."""
+    quads = np.flatnonzero(arrays.poly_sizes == 4)
+    if quads.size == 0:
+        return quads, np.zeros(0)
+    loops = arrays.poly_offsets[quads][:, None] + np.arange(4)[None, :]
+    points = arrays.co[arrays.loop_verts[loops]].astype(np.float64)        # (Q, 4, 3)
+    worst = np.ones(quads.size)
+    for k in range(4):
+        a = points[:, (k - 1) % 4] - points[:, k]
+        b = points[:, (k + 1) % 4] - points[:, k]
+        denominator = np.linalg.norm(a, axis=1) * np.linalg.norm(b, axis=1)
+        sine = np.linalg.norm(np.cross(a, b), axis=1) / np.maximum(denominator, 1e-30)
+        worst = np.minimum(worst, sine)
+    return quads, worst
+
+
+def relax_bad_quads(mesh, surface_tree, sharp_angle_degrees, passes: int) -> int:
+    """Even out only the badly shaped quads and put the moved vertices back on the original surface.
+
+    The engine already improves the quads it makes; what is left are quads squeezed between a pole and a
+    hard edge or where the size changes quickly. Vertices on hard edges and on open borders (the symmetry cut
+    included) never move, a vertex moves at most one local edge per pass, and a move that folds a quad or
+    flips its normal is undone. Returns how many bad quads were left.
+    """
+    left = 0
+    for _ in range(max(0, passes)):
+        arrays = mio.read_mesh_arrays(mesh)
+        quads, sines = quad_corner_sines(arrays)
+        bad = quads[sines < BAD_QUAD_SINE]
+        left = int(bad.size)
+        if bad.size == 0:
+            break
+        fixed = geo.boundary_vertex_mask(arrays)
+        if sharp_angle_degrees is not None:
+            fixed |= geo.edge_vertex_mask(arrays, geo.detect_sharp_edges(arrays, sharp_angle_degrees))
+        in_bad = np.zeros(arrays.n_verts, dtype=bool)
+        loops = arrays.poly_offsets[bad][:, None] + np.arange(4)[None, :]
+        in_bad[arrays.loop_verts[loops].reshape(-1)] = True
+        free = in_bad & ~fixed
+        if not free.any():
+            break
+        before = arrays.co.astype(np.float64)
+        relaxed = geo.relax_positions(before, arrays.edges, ~free, RELAX_BAD_STRENGTH, iterations=1)
+        limit = RELAX_BAD_MAX_MOVE_EDGES * geo.vertex_mean_edge_length(arrays)
+        after = before.copy()
+        for index in np.flatnonzero(free):
+            hit = surface_tree.find_nearest(Vector(relaxed[index]))
+            target = np.asarray(hit[0] if hit[0] is not None else relaxed[index], dtype=np.float64)
+            step = target - before[index]
+            length = float(np.linalg.norm(step))
+            if length > limit[index] > 0.0:
+                step *= limit[index] / length
+            after[index] = before[index] + step
+
+        # undo the moves that make a neighbouring quad worse than it was or fold it
+        trial = geo.MeshArrays(co=after, edges=arrays.edges, poly_offsets=arrays.poly_offsets,
+                               loop_verts=arrays.loop_verts, loop_edges=arrays.loop_edges)
+        _, new_sines = quad_corner_sines(trial)
+        worse = quads[(new_sines < sines - 0.05) | (new_sines < 0.15)]
+        if worse.size:
+            loops = arrays.poly_offsets[worse][:, None] + np.arange(4)[None, :]
+            revert = np.unique(arrays.loop_verts[loops].reshape(-1))
+            after[revert] = before[revert]
+        if np.allclose(after, before):
+            break
+        mio.write_vertex_coordinates(mesh, after)
+    return left
+
+
 def transfer_zone_labels(surface_tree, original_labels: np.ndarray, target_mesh) -> bool:
     """Give every face of ``target_mesh`` the zone label of the nearest original face.
 

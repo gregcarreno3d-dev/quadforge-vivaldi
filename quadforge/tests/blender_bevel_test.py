@@ -52,12 +52,16 @@ def remesh(src, soft):
     return r.levels[0].object, r.levels[0].stats
 
 
+from quadforge.core import mesh_io as mio
 src = build()
 with_soft, st = remesh(src, True)
 d_on = deviation(src, with_soft)
 check(st["non_manifold_edges"] == 0 and st["border_edges"] == 0, "closed manifold result")
 check(st["quads"] / st["faces"] > 0.9, "mostly quads")
 check(abs(st["faces"] - 20000) / 20000 < 0.2, "face count near the target (%d)" % st["faces"])
+from quadforge.core import detail
+_q, _s = detail.quad_corner_sines(mio.read_mesh_arrays(with_soft.data))
+check(float((_s < detail.BAD_QUAD_SINE).mean()) < 0.06, "badly shaped quads are rare after the relaxation (%.1f percent)" % (100 * float((_s < detail.BAD_QUAD_SINE).mean())))
 without, _ = remesh(src, False)
 d_off = deviation(src, without)
 p_on, p_off = np.percentile(d_on, 99), np.percentile(d_off, 99)

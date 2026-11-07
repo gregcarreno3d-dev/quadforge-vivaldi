@@ -64,6 +64,7 @@ DUPLICATE_VERTEX_DISTANCE = 1e-6          # relative to the model size; merges d
 MIN_SYMMETRY_TOLERANCE = 1e-7             # relative to the model size
 MIN_FACES_PER_PIECE = 8                   # never ask the engine for fewer quads than this
 MAX_HARD_EDGE_FRACTION = 0.25             # warn if more than 25% of the edges are "hard"
+RELAX_PASSES = 4                         # passes of the bad-quad relaxation
 THIN_BAND_STRONG_FLOOR = 0.6            # first try: the cleanest rows along thin chamfer strips (the engine's grid may refuse it)
 THIN_BAND_FLOOR = 0.75                   # strongest refinement of a thin strip between hard edges (finer breaks the engine's grid)
 THIN_BAND_MIN_LENGTH = 12.0              # only long strips (rims, chamfer rings, fillets) are refined
@@ -111,6 +112,7 @@ class RemeshSettings:
     sharp_angle_deg: float = 35.0
     use_existing_sharp: bool = True
     soft_bevels: bool = True                 # keep the rows along rounded bevels made of shallow facets
+    relax_quads: bool = True         # even out badly shaped quads and put them back on the surface
     soft_bevel_detail: float = 0.5           # edge length multiplier on the facets of rounded bevels (1 = no refinement)
     use_seams: bool = True
     smart_features: bool = True      # judge whole chains of sharp edges, not single edges
@@ -242,7 +244,7 @@ def _bounding_box_diagonal(evaluated_object) -> float:
 def _wants_surface_tree(settings: RemeshSettings, uses_zones: bool) -> bool:
     """The BVH tree costs time and memory, so only build it when something will use it."""
     symmetry_check = settings.check_symmetry and (settings.sym_x or settings.sym_y or settings.sym_z)
-    return settings.use_reproject or symmetry_check or uses_zones or settings.subdivision_match
+    return settings.use_reproject or symmetry_check or uses_zones or settings.subdivision_match or settings.relax_quads
 
 
 def _read_source(context, original, settings: RemeshSettings, uses_zones: bool,
@@ -1193,6 +1195,9 @@ def run_steps(context, original, settings: RemeshSettings,
                 with profiler.stage(f"Level {label}: polish and snap"):
                     detail.polish_mesh(half_mesh, source.surface_tree, plan, snap_angle,
                                        settings.polish_passes)
+            if settings.relax_quads and settings.output == "QUADS" and source.surface_tree is not None:
+                with profiler.stage(f"Level {label}: relax bad quads"):
+                    detail.relax_bad_quads(half_mesh, source.surface_tree, snap_angle, RELAX_PASSES)
             finished_halves.append((target, half_mesh, constraints.hard_edge_count,
                                     time.perf_counter() - level_started))
             if index + 1 < len(level_plan.targets) and not forge:
