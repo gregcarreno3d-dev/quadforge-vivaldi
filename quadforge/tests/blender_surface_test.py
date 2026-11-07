@@ -26,6 +26,9 @@ check(bpy.ops.quadforge.set_surface(surface="NOPE") == {"CANCELLED"}, "unknown s
 
 s.sym_x = True; s.output_type = "TRIS"; s.backend = "FORGE"; s.use_materials = True
 bpy.ops.quadforge.set_surface(surface="ORGANIC")
+s.backend = "QUADRIFLOW"
+check(s.engine == "FORGE" and s.to_settings().backend == "FORGE", "an old scene that stored QuadriFlow still runs FORGE")
+s.backend = "FORGE"
 check(s.sym_x and s.output_type == "TRIS" and s.backend == "FORGE" and s.use_materials, "buttons leave symmetry, zones, output and engine alone")
 
 check(s.surface_type == "ORGANIC", "button still marked after the profile wrote its values")

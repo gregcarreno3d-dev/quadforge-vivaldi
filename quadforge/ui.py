@@ -67,7 +67,7 @@ def _level_plan(settings) -> planning.LevelPlan:
 
 def _guidance_options(settings) -> guidance.GuidanceOptions:
     plan = _level_plan(settings)
-    forge = settings.backend == "FORGE"
+    forge = settings.engine == "FORGE"
     return guidance.GuidanceOptions(
         target_quads=settings.target_quads,
         symmetry_axes=tuple(axis for axis, enabled in enumerate((settings.sym_x, settings.sym_y, settings.sym_z)) if enabled),
@@ -176,9 +176,7 @@ class QUADFORGE_PT_main(_QuadForgePanel, bpy.types.Panel):
             layout.label(text=translate(texts.LABEL_HEAVY_TARGET), icon="INFO")
 
         layout.separator()
-        layout.prop(settings, "backend")
-        if settings.backend == "FORGE":
-            layout.row().prop(settings, "output_type", expand=True)
+        layout.row().prop(settings, "output_type", expand=True)
 
         remesh_row = layout.row()
         remesh_row.scale_y = 1.6
@@ -242,7 +240,7 @@ class QUADFORGE_PT_guides(_QuadForgePanel, bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.quadforge.backend == "FORGE"
+        return context.scene.quadforge.engine == "FORGE"
 
     def draw_header(self, context):
         self.layout.prop(context.scene.quadforge, "use_flow_guides", text="")
@@ -344,7 +342,7 @@ class QUADFORGE_PT_density(_QuadForgePanel, bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.quadforge.backend == "FORGE"
+        return context.scene.quadforge.engine == "FORGE"
 
     def draw(self, context):
         layout = self.layout
@@ -382,7 +380,7 @@ class QUADFORGE_PT_speed(_QuadForgePanel, bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.quadforge.backend != "FORGE"   # FORGE needs no working copy or polish
+        return context.scene.quadforge.engine != "FORGE"   # FORGE needs no working copy or polish
 
     def draw(self, context):
         layout = self.layout
@@ -507,7 +505,7 @@ class QUADFORGE_PT_advanced(_QuadForgePanel, bpy.types.Panel):
         layout.prop(settings, "hide_original")
         layout.prop(settings, "transfer_uvs")
         layout.prop(settings, "transfer_zones")
-        if settings.backend != "FORGE":
+        if settings.engine != "FORGE":
             layout.prop(settings, "seed")
         layout.separator()
         layout.operator("quadforge.reset_settings", icon="LOOP_BACK")

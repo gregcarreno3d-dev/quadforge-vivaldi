@@ -1,5 +1,6 @@
 """Settings stored in the scene (``scene.quadforge``) and the last result shown in the panel."""
 import math
+import os
 
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
@@ -59,7 +60,7 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
     # ---------------------------------------------------------------- engine and output
     backend: EnumProperty(
         name="Engine",
-        description="Which remeshing engine does the work",
+        description="Legacy setting kept for old scenes; FORGE is always used unless QUADFORGE_LEGACY_ENGINE=1 is set",
         items=[
             ("FORGE", "FORGE (QuadForge)", "QuadForge's own engine: quads or triangles, fast on heavy meshes, "
                                            "paintable density. Runs as a separate process"),
@@ -343,13 +344,19 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
     last_levels_text: StringProperty(default="", options={"SKIP_SAVE"})      # one line per level
     last_warnings: StringProperty(default="", options={"SKIP_SAVE"})
 
+    @property
+    def engine(self) -> str:
+        """The engine that really runs. FORGE is the only one offered; the legacy QuadriFlow route stays reachable for
+        development (environment variable QUADFORGE_LEGACY_ENGINE=1) while it is being retired."""
+        return self.backend if os.environ.get("QUADFORGE_LEGACY_ENGINE") == "1" else "FORGE"
+
     def to_settings(self) -> RemeshSettings:
         """Copy the UI values into a plain object the pipeline can use (no Blender types)."""
         return RemeshSettings(
             target_quads=self.target_quads,
             extra_levels=self.extra_levels,
-            backend=self.backend,
-            output="QUADS" if self.backend != "FORGE" else self.output_type,
+            backend=self.engine,
+            output="QUADS" if self.engine != "FORGE" else self.output_type,
             density_group=self.density_group,
             density_ratio=self.density_ratio,
             zone_factors={item.name: item.factor for item in self.zone_factors if abs(item.factor - 1.0) > 1e-6},

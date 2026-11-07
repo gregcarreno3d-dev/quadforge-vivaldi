@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Changed
+- **FORGE is now the only engine offered.** The *Engine* selector is gone and so are the panels that only served QuadriFlow's route (working copy, polish, seed). Scenes saved with QuadriFlow selected run FORGE. The QuadriFlow backend stays in the code for development (`QUADFORGE_LEGACY_ENGINE=1`) until it is removed.
+- If the engine file is missing, the message now says to install the zip made for your system.
+
 ## 0.12.0 - 2026-11-07
 
 New

@@ -50,7 +50,7 @@ def find_engine(root: Path | None = None) -> Path:
     if not path.is_file():
         raise BackendError(
             f"The FORGE engine for this system ('{folder}') is not inside the add-on. "
-            f"Expected: {path}. Choose the QuadriFlow engine instead.")
+            f"Expected: {path}. Install the zip made for your system (the all-platforms zip has every engine).")
     if not sys.platform.startswith("win") and not os.access(path, os.X_OK):
         # Blender's zip installer does not keep the executable bit.
         try:

@@ -90,7 +90,7 @@ class QUADFORGE_OT_remesh(bpy.types.Operator):
         self.interactive = True
         snapshot = guidance.snapshot_from_object(context.active_object)
         scene_settings = context.scene.quadforge
-        lightweight = scene_settings.use_proxy or scene_settings.backend == "FORGE"
+        lightweight = scene_settings.use_proxy or scene_settings.engine == "FORGE"
         if not guidance.needs_confirmation(snapshot.face_count, lightweight):
             return self.execute(context)
         window_manager = context.window_manager

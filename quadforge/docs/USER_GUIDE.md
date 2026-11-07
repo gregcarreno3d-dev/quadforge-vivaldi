@@ -10,7 +10,7 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 ## 2. Main options
 | Option | What it does |
 |---|---|
-| **Engine** | *FORGE*: own engine (quads or triangles, reads heavy sculpts directly, paintable density). *QuadriFlow*: Blender's built-in engine (quads only, uses a working copy). |
+| **Engine** | *FORGE*, the add-on's own engine (quads or triangles, reads heavy sculpts directly, paintable density). It is the only engine offered; the old QuadriFlow route is being retired. |
 | **Output** (FORGE only) | *Quads* (animation, subdivision, sculpting) or *Triangles* (games, 3D printing, simulation; even, well-shaped triangles). |
 | **Target Faces** | Approximate face count of the result (the real count varies by a few percent). |
 | **Surface type** | Hard Surface: hard edges from 30°, right angles and snapping on, Detail on Curves Off. Soft Surface / Organic: hard-edge detection off (your own sharp edges and seams still count), Detail on Curves Medium. Neither touches symmetry, zones, output or engine. Changing one of those values by hand unmarks the button. |
@@ -41,9 +41,9 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 ## 5. When something goes wrong
 | Symptom | What to do |
 |---|---|
-| "The FORGE engine for this system is not inside the add-on" | The executable is missing from `bin/<system>/`; reinstall the zip or use QuadriFlow. |
+| "The FORGE engine for this system is not inside the add-on" | The executable is missing from `bin/<system>/`; reinstall the zip made for your system (the all-platforms zip has every engine). |
 | macOS blocks the executable | It is an unsigned binary: allow it in Settings > Privacy & Security (or `xattr -d com.apple.quarantine bin/macos-*/forge`). |
 | Count far from the target | Hard edges and zones add constraints: raise the angle or turn zones off. |
-| Many poles in quads | Known limit of 0.5 (see `STATUS_AND_LIMITS.md`). Try Triangles or QuadriFlow. |
-| Slow result | With QuadriFlow turn on the working copy; FORGE does not need it. |
+| Many poles in quads | Known limit of 0.5 (see `STATUS_AND_LIMITS.md`). Try Triangles. |
+| Slow result | Lower the target faces or use Quick Preview first. |
 | Engine error | The message appears in Blender; Blender does not close. Report the message and the mesh size. |
