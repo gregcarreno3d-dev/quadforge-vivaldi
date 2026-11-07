@@ -1,4 +1,4 @@
-# User guide — QuadForge Vivaldi 0.12.0
+# User guide — QuadForge Vivaldi 0.13.0
 
 ## 1. Basic flow (3 steps)
 1. Select the mesh (triangles or quads, any density). The add-on switches to Object Mode by itself.

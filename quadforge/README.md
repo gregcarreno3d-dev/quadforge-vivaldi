@@ -1,4 +1,4 @@
-# QuadForge Vivaldi 0.12.0
+# QuadForge Vivaldi 0.13.0
 
 > The FORGE engine is validated in Blender 5.2 on Linux; the Windows and macOS binaries are built but not yet widely tested.
 
@@ -23,7 +23,7 @@ quad meshes that fit your sculpt.
 
 ## Installation
 
-Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose `quadforge-vivaldi-0.12.0-all-platforms.zip`.
+Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose `quadforge-vivaldi-0.13.0-all-platforms.zip`.
 The panel appears in the 3D Viewport, sidebar (**N** key), **QuadForge** tab.
 
 ## Usage in 3 steps

@@ -729,7 +729,8 @@ def _remesh_with_engine(context, mesh, plan: sym.SymmetryPlan, settings: RemeshS
             raise PipelineError(str(error)) from error
         remeshed = work_object.data
         info = request.engine_info or {}
-        if warnings is not None and info.get("density_note") == "partial" and info.get("method") != "pair":
+        asked_for_density = bool(settings.density_group) or any(abs(float(f) - 1.0) > 1e-6 for f in settings.zone_factors.values())
+        if warnings is not None and asked_for_density and info.get("density_note") == "partial" and info.get("method") != "pair":
             warnings.append("The density variation was only partly followed: this shape kept a clean quad flow instead. Try a lower density strength for a stronger effect.")
         if warnings is not None and info.get("curv_dropped"):
             with_curves, without = info["curv_dropped"]
