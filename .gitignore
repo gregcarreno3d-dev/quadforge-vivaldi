@@ -5,3 +5,4 @@ quadforge/devtools/engine_tests/out/
 tests/out/
 *.zip
 engine/bin/
+engine-rs/target/
