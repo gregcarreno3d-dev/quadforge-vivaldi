@@ -69,36 +69,79 @@ fn rotate_to(mut q: [i32; 4], v: i32) -> [i32; 4] {
 fn subdivide_polygons(poly: &PolyMesh, cfeat: &[u8], feat: &SegmentIndex, rho: f64) -> Quads {
     let mut s = Quads { p: poly.p.clone(), f: Vec::new(), feat: cfeat.to_vec() };
     let mut mid: HashMap<u64, i32> = HashMap::new();
-    let mut at = 0usize;
-    for &sz in &poly.sizes {
-        let sz = sz as usize;
+    let ladder = !env_set("FORGE_NOLADDER");
+    // A polygon that touches itself at a vertex is cut at that vertex into simple loops.
+    let mut polys: Vec<Vec<i32>> = Vec::new();
+    {
+        let mut at0 = 0usize;
+        for &sz in &poly.sizes {
+            let sz = sz as usize;
+            let mut stack: Vec<i32> = Vec::new();
+            for &v in &poly.idx[at0..at0 + sz] {
+                if let Some(pos) = stack.iter().position(|&x| x == v) {
+                    let lp: Vec<i32> = stack.split_off(pos + 1);
+                    if lp.len() >= 3 { polys.push(lp.iter().copied().chain(std::iter::once(v)).collect::<Vec<_>>()); }
+                    // the cycle v, lp... is closed; v stays on the stack
+                } else { stack.push(v); }
+            }
+            if stack.len() >= 3 { polys.push(stack); }
+            at0 += sz;
+        }
+    }
+    for lp in &polys {
+        let sz = lp.len();
+        let mut midpoint = |s: &mut Quads, a: i32, b: i32| -> i32 {
+            let key = edge_key(a, b);
+            if let Some(&id) = mid.get(&key) { return id; }
+            let id = s.p.len() as i32;
+            let mp = (poly.p[a as usize] + poly.p[b as usize]) * 0.5;
+            s.p.push(mp);
+            let mut ff = 0u8;
+            if s.feat[a as usize] >= 1 && s.feat[b as usize] >= 1 && !feat.is_empty() {
+                let h = feat.closest(mp);
+                if h.seg >= 0 && h.p.distance(mp) < 0.15 * rho { ff = 1; }
+            }
+            s.feat.push(ff);
+            mid.insert(key, id);
+            id
+        };
+        if ladder && sz >= 6 {
+            // A big hole polygon as a centroid star would be a pole of valence sz. Cut it instead into a ladder
+            // of quads between opposite boundary vertices: no interior vertex, only the two ends of each rung gain
+            // one edge, and the relaxation spreads the rest.
+            let mut ring: Vec<i32> = Vec::with_capacity(2 * sz);
+            for k in 0..sz {
+                let (a, b) = (lp[k], lp[(k + 1) % sz]);
+                ring.push(a);
+                ring.push(midpoint(&mut s, a, b));
+            }
+            let m = ring.len();
+            let h = m / 2;
+            // rotation whose first and last rungs are farthest apart (the ladder runs along the long axis)
+            let pos = |s: &Quads, i: i32| s.p[i as usize];
+            let mut best = (-1.0, 0usize);
+            for r in 0..m {
+                let e0 = (pos(&s, ring[r]) + pos(&s, ring[(r + m - 1) % m])) * 0.5;
+                let e1 = (pos(&s, ring[(r + h - 1) % m]) + pos(&s, ring[(r + h) % m])) * 0.5;
+                let d = e0.distance(e1);
+                if d > best.0 { best = (d, r); }
+            }
+            let rr = best.1;
+            let rv = |i: usize| ring[(rr + i) % m];
+            for i in 0..h - 1 { s.f.push([rv(i), rv(i + 1), rv(m - 2 - i), rv(m - 1 - i)]); }
+            continue;
+        }
         let mut ctr = Vec3::ZERO;
-        for k in 0..sz { ctr += poly.p[poly.idx[at + k] as usize]; }
+        for k in 0..sz { ctr += poly.p[lp[k] as usize]; }
         let cid = s.p.len() as i32;
         s.p.push(ctr / sz as f64);
         s.feat.push(0);
         for k in 0..sz {
-            let (a, b, z) = (poly.idx[at + k], poly.idx[at + (k + 1) % sz], poly.idx[at + (k + sz - 1) % sz]);
-            let mut midpoint = |s: &mut Quads, a: i32, b: i32| -> i32 {
-                let key = edge_key(a, b);
-                if let Some(&id) = mid.get(&key) { return id; }
-                let id = s.p.len() as i32;
-                let mp = (poly.p[a as usize] + poly.p[b as usize]) * 0.5;
-                s.p.push(mp);
-                let mut ff = 0u8;
-                if s.feat[a as usize] >= 1 && s.feat[b as usize] >= 1 && !feat.is_empty() {
-                    let h = feat.closest(mp);
-                    if h.seg >= 0 && h.p.distance(mp) < 0.15 * rho { ff = 1; }
-                }
-                s.feat.push(ff);
-                mid.insert(key, id);
-                id
-            };
+            let (a, b, z) = (lp[k], lp[(k + 1) % sz], lp[(k + sz - 1) % sz]);
             let mab = midpoint(&mut s, a, b);
             let mza = midpoint(&mut s, z, a);
             s.f.push([a, mab, cid, mza]);
         }
-        at += sz;
     }
     s
 }
