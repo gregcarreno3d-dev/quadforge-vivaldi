@@ -20,7 +20,8 @@ use crate::stages::remesh::{RemeshParams, RemeshStats, Remesher};
 use crate::stages::repair::{self, TriSoup};
 use crate::stages::sizefield::{curvature_size_field, gap_size_field, thickness_size_field, SizeFieldParams, SizeFieldStats};
 use crate::util::protocol::{json_safe, say};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use crate::math::geom::closest_point_on_segment;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
@@ -83,10 +84,82 @@ fn long_feature_chains(soup: &TriSoup, requested: i32) -> (Vec<[i32; 2]>, Vec<[V
         let r = find(&mut parent, e[0] as usize);
         *chain.entry(r).or_insert(0.0) += soup.p[e[0] as usize].distance(soup.p[e[1] as usize]);
     }
+    let mut keep: Vec<bool> = soup.features.iter().map(|e| { let r = find(&mut parent, e[0] as usize); chain[&r] >= 6.0 * rho0 }).collect();
+    // Two marked lines closer than about half a cell (the two edges of a narrow chamfer) cannot both be rows of the
+    // lattice: they land on neighbouring rows a fraction of a cell apart and make zero-width quads. Find marked
+    // edges that sit near another marked edge which is far away along the chain (or in another chain), group them
+    // into runs, and keep only the longer run of each close pair; the lattice then runs through the narrow band.
+    let ratio = env_f64("FORGE_THINFEAT").unwrap_or(1.0);
+    if ratio > 0.0 {
+        let n = soup.features.len();
+        let thr = ratio * rho0;
+        let cell = (2.0 * thr).max(1e-12);
+        let key = |p: Vec3| ((p.x / cell).floor() as i64, (p.y / cell).floor() as i64, (p.z / cell).floor() as i64);
+        let mid: Vec<Vec3> = soup.features.iter().map(|e| (soup.p[e[0] as usize] + soup.p[e[1] as usize]) * 0.5).collect();
+        let len: Vec<f64> = soup.features.iter().map(|e| soup.p[e[0] as usize].distance(soup.p[e[1] as usize])).collect();
+        let mut grid: HashMap<(i64, i64, i64), Vec<usize>> = HashMap::new();
+        for i in 0..n { if keep[i] { grid.entry(key(mid[i])).or_default().push(i); } }
+        // vertex -> incident kept edges, to measure how far apart two edges are along the chain
+        let mut inc: HashMap<i32, Vec<usize>> = HashMap::new();
+        for i in 0..n { if keep[i] { for v in soup.features[i] { inc.entry(v).or_default().push(i); } } }
+        let hop_limit = 6;
+        let near_along = |i: usize| -> Vec<usize> {
+            let mut seen: HashSet<usize> = HashSet::new();
+            seen.insert(i);
+            let mut frontier = vec![i];
+            for _ in 0..hop_limit {
+                let mut next = Vec::new();
+                for &e in &frontier { for v in soup.features[e] { for &g in &inc[&v] { if seen.insert(g) { next.push(g); } } } }
+                frontier = next;
+            }
+            seen.into_iter().collect()
+        };
+        let mut partner: Vec<Option<usize>> = vec![None; n]; // edge -> a close edge on a different run
+        for i in 0..n {
+            if !keep[i] { continue; }
+            let close_along: HashSet<usize> = near_along(i).into_iter().collect();
+            let (kx, ky, kz) = key(mid[i]);
+            let mut best = (f64::INFINITY, None);
+            for dx in -1..=1 { for dy in -1..=1 { for dz in -1..=1 {
+                let Some(list) = grid.get(&(kx + dx, ky + dy, kz + dz)) else { continue };
+                for &j in list {
+                    if close_along.contains(&j) { continue; }
+                    let f = soup.features[j];
+                    let (q, _) = closest_point_on_segment(mid[i], soup.p[f[0] as usize], soup.p[f[1] as usize]);
+                    let d = q.distance(mid[i]);
+                    if d < thr && d < best.0 { best = (d, Some(j)); }
+                }
+            } } }
+            partner[i] = best.1;
+        }
+        // runs: connected groups of edges that have a partner
+        let mut par2: Vec<usize> = (0..n).collect();
+        fn root(p: &mut Vec<usize>, mut x: usize) -> usize { while p[x] != x { p[x] = p[p[x]]; x = p[x]; } x }
+        for i in 0..n {
+            if partner[i].is_none() { continue; }
+            for v in soup.features[i] { for &g in &inc[&v] { if partner[g].is_some() { let (a, b) = (root(&mut par2, i), root(&mut par2, g)); par2[a] = b; } } }
+        }
+        let mut run_len: HashMap<usize, f64> = HashMap::new();
+        for i in 0..n { if partner[i].is_some() { let r = root(&mut par2, i); *run_len.entry(r).or_insert(0.0) += len[i]; } }
+        let mut dropped_run: HashSet<usize> = HashSet::new();
+        let mut order: Vec<usize> = run_len.keys().copied().collect();
+        order.sort_by(|a, b| run_len[a].partial_cmp(&run_len[b]).unwrap().then(a.cmp(b))); // shortest first
+        let mut pairs: HashMap<usize, HashSet<usize>> = HashMap::new();
+        for i in 0..n { if let Some(j) = partner[i] { let (a, b) = (root(&mut par2, i), if partner[j].is_some() { root(&mut par2, j) } else { usize::MAX }); if b != usize::MAX && a != b { pairs.entry(a).or_default().insert(b); } else if b == usize::MAX { pairs.entry(a).or_default().insert(usize::MAX); } } }
+        for r in order {
+            // drop this run if it faces a longer run that is still kept, or an unmarked-partner (shouldn't happen)
+            let faces_longer = pairs.get(&r).map_or(false, |s| s.iter().any(|&o| o != usize::MAX && !dropped_run.contains(&o) && (run_len[&o] > run_len[&r] || (run_len[&o] == run_len[&r] && o > r))));
+            if faces_longer { dropped_run.insert(r); }
+        }
+        let mut dropped = 0;
+        for i in 0..n {
+            if partner[i].is_some() && dropped_run.contains(&root(&mut par2, i)) { keep[i] = false; dropped += 1; }
+        }
+        if dbg() { eprintln!("thin feature pairs: {} close edges in {} runs, dropped {dropped} of {n} marked edges (distance < {thr:.4})", partner.iter().flatten().count(), run_len.len()); }
+    }
     let (mut feats, mut segs) = (Vec::new(), Vec::new());
-    for e in &soup.features {
-        let r = find(&mut parent, e[0] as usize);
-        if chain[&r] >= 6.0 * rho0 { feats.push(*e); segs.push([soup.p[e[0] as usize], soup.p[e[1] as usize]]); }
+    for (i, e) in soup.features.iter().enumerate() {
+        if keep[i] { feats.push(*e); segs.push([soup.p[e[0] as usize], soup.p[e[1] as usize]]); }
     }
     (feats, segs)
 }
