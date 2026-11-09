@@ -133,6 +133,11 @@ impl<'a> Remesher<'a> {
         for e in &cand {
             let x = self.find_edge(e.a, e.b, &mut sc);
             if x < 0 { continue; }
+            {
+                // splitting a border edge whose apex is also on the border would put a chord between two border vertices
+                let m = &self.mesh;
+                if m.o[x as usize] < 0 && !m.orbit(m.v[x as usize], &mut sc) { continue; }
+            }
             let m = &mut self.mesh;
             let dens = 0.5 * (m.vdens[e.a as usize] + m.vdens[e.b as usize]);
             let mid = (m.p[e.a as usize] + m.p[e.b as usize]) * 0.5;
@@ -154,6 +159,12 @@ impl<'a> Remesher<'a> {
         let fc = face_of(c);
         let fd = if d >= 0 { face_of(d) } else { -1 };
 
+        // an interior edge between two border vertices must not collapse: it would pinch the border
+        if d >= 0 {
+            let mut sc0: Vec<i32> = Vec::new();
+            if !m.orbit(keep, &mut sc0) && !m.orbit(rem, &mut sc0) { return false; }
+        }
+
         // link condition
         let mut nk: Vec<Nb> = Vec::new();
         let mut nr: Vec<Nb> = Vec::new();
@@ -163,6 +174,14 @@ impl<'a> Remesher<'a> {
         let mut common = 0;
         for x in &nk { for y in &nr { if x.v == y.v { common += 1; } } }
         if common != if d >= 0 { 2 } else { 1 } { return false; }
+        // a border vertex that absorbs an interior neighbour must not become connected to another border vertex
+        // (that edge would be a chord across the border)
+        if d >= 0 && !m.orbit(keep, &mut scratch) {
+            for y in &nr {
+                if y.v == keep || nk.iter().any(|x| x.v == y.v) { continue; }
+                if !m.orbit(y.v, &mut scratch) { return false; }
+            }
+        }
 
         // valence of the two apex vertices must stay valid
         {
@@ -265,6 +284,8 @@ impl<'a> Remesher<'a> {
                 val[i] = sc.len() as i32 + if closed[i] { 0 } else { 1 };
                 target[i] = if closed[i] { 6 } else { 4 };
             }
+            // a new edge between two border vertices would be a chord across the border (a second edge to mirror onto)
+            if !closed[0] && !closed[1] { continue; }
             if val[2] - 1 < if closed[2] { 3 } else { 2 } || val[3] - 1 < if closed[3] { 3 } else { 2 } { continue; }
             let sq = |x: i32| x * x;
             let before = sq(val[0] - target[0]) + sq(val[1] - target[1]) + sq(val[2] - target[2]) + sq(val[3] - target[3]);
@@ -355,6 +376,18 @@ impl<'a> Remesher<'a> {
         }
     }
 
+    fn chords(&self) -> usize {
+        let m = &self.mesh;
+        let mut sc: Vec<i32> = Vec::new();
+        let mut n = 0;
+        for c in 0..m.num_face_slots() * 3 {
+            if !m.falive[face_of(c) as usize] || m.o[c as usize] < 0 { continue; }
+            let (a, b) = (m.v[nxt(c) as usize], m.v[prv(c) as usize]);
+            if a < b && !m.orbit(a, &mut sc) && !m.orbit(b, &mut sc) { n += 1; }
+        }
+        n
+    }
+
     fn step(&mut self, l: f64, smooth_repeats: i32) {
         let mut ns = 0;
         for _ in 0..6 {
@@ -363,8 +396,11 @@ impl<'a> Remesher<'a> {
             if n == 0 { break; }
         }
         let nf0 = self.mesh.alive_faces;
+        let c0 = if self.prm.check { self.chords() } else { 0 };
         let nc = self.collapse_pass(l);
+        let c1 = if self.prm.check { self.chords() } else { 0 };
         let nfl = self.flip_pass(l);
+        if self.prm.check { eprintln!("chords: after split {c0}, after collapse {c1}, after flip {}", self.chords()); }
         if self.prm.check {
             eprintln!("step: splits {ns} -> faces {nf0}, collapses {nc}, flips {nfl}, faces now {}", self.mesh.alive_faces);
         }
