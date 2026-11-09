@@ -88,7 +88,7 @@ pub fn improve_quads(p: &mut [Vec3], quads: &[[i32; 4]], frozen: &[bool], refere
             let old = p[v];
             let mut best = cur;
             let mut best_pos = old;
-            let mut try_pos = |c: Vec3, p: &mut [Vec3], best: &mut f64, best_pos: &mut Vec3| {
+            let try_pos = |c: Vec3, p: &mut [Vec3], best: &mut f64, best_pos: &mut Vec3| {
                 let h = reference.closest_any(c);
                 let c = if h.tri >= 0 { h.p } else { c };
                 // never squeeze an edge: keep every edge of the vertex at least a third of the usual length

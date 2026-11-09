@@ -40,6 +40,41 @@ jobs:
           name: forge-${{ matrix.name }}
           path: engine/bin/${{ matrix.name }}/${{ matrix.exe }}
 
+  engine-rs:
+    name: Rust engine ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux,       os: ubuntu-latest,  exe: forge }
+          - { name: windows,     os: windows-latest, exe: forge.exe }
+          - { name: macos-arm64, os: macos-latest,   exe: forge }
+          - { name: macos-x64,   os: macos-15-intel, exe: forge }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m pip install numpy scikit-image
+      - name: Unit tests
+        run: cargo test --release --manifest-path engine-rs/Cargo.toml
+      - name: Build the Rust engine natively
+        run: python tools/build_rust.py
+      - name: Engine hard cases (29 models)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t08_hard_cases.py
+      - name: Engine robustness (quick)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t07_robustness.py --quick
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-rs-${{ matrix.name }}
+          path: engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
+
   addon:
     name: Add-on tests in Blender (bpy)
     runs-on: ubuntu-latest

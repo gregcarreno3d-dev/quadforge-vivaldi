@@ -339,7 +339,15 @@ fn grid_route(o: &Options, rem: &Remesher, soup: &TriSoup, free_soup: &TriSoup, 
     let mut best_stats = ExtractStats::default();
     let mut best_err = 1e300f64;
     let mut any = false;
-    for pass in 0..3 {
+    // (cell size, quad count) of the passes that closed; the count jumps with the grid, so after three passes a
+    // result that is still off by more than 6% gets up to two more tries bracketed by the best neighbours.
+    let mut tried: Vec<(f64, f64)> = Vec::new();
+    let tol = if requested >= 30000 { 0.06 } else { 0.04 };
+    let mut pass = 0;
+    while pass < 5 {
+        if pass >= 3 && (!any || best_err <= 0.06) { break; }
+        pass += 1;
+        let pass = pass - 1;
         let mut es = ExtractStats::default();
         let mut quads = PolyMesh::default();
         if let Err(e) = ex.run(&mut quads, &mut es) {
@@ -359,11 +367,13 @@ fn grid_route(o: &Options, rem: &Remesher, soup: &TriSoup, free_soup: &TriSoup, 
             continue;
         }
         let ratio = quads.sizes.len() as f64 / requested as f64;
+        let count = quads.sizes.len() as f64;
         if dbg() { eprintln!("pass {pass}: {} quads for {requested} requested (ratio {ratio:.3})", quads.sizes.len()); }
         let err = (ratio - 1.0).abs();
         if err < best_err { best_err = err; best = quads; best_stats = es; any = true; }
-        if err < if requested >= 30000 { 0.06 } else { 0.04 } { break; }
-        let r = ex.prm.rho * ratio.sqrt();
+        if err < tol { break; }
+        tried.push((ex.prm.rho, count));
+        let r = next_rho(ex.prm.rho, ratio, &tried, requested as f64);
         ex.set_rho(r);
     }
     if any && capped && best_err > 0.25 {
@@ -412,4 +422,17 @@ fn grid_route(o: &Options, rem: &Remesher, soup: &TriSoup, free_soup: &TriSoup, 
         }
     }
     if any { Ok(Some(Grid { result: best, stats: best_stats, density_note })) } else { Ok(None) }
+}
+
+/// Next cell size: the plain area rule, or an interpolation between the closest passes on each side of the target.
+fn next_rho(rho: f64, ratio: f64, tried: &[(f64, f64)], target: f64) -> f64 {
+    let below = tried.iter().filter(|t| t.1 < target).max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()); // closest count under
+    let above = tried.iter().filter(|t| t.1 > target).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    if let (Some(lo), Some(hi)) = (below, above) {
+        // lo has the larger cell size, hi the smaller; the count is about proportional to 1/rho^2
+        let t = ((target - lo.1) / (hi.1 - lo.1).max(1e-9)).clamp(0.15, 0.85);
+        let r = lo.0 + (hi.0 - lo.0) * t;
+        if r.is_finite() && r > 0.0 { return r; }
+    }
+    rho * ratio.sqrt()
 }

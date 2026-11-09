@@ -43,6 +43,9 @@ def platform_folder() -> str:
 
 def find_engine(root: Path | None = None) -> Path:
     """Path of the engine executable for this computer, made executable if needed."""
+    override = os.environ.get("FORGE_ENGINE")        # developers: use another build of the engine (e.g. the Rust one)
+    if override and Path(override).is_file():
+        return Path(override)
     root = root or _ADDON_ROOT
     name = "forge.exe" if sys.platform.startswith("win") else "forge"
     folder = platform_folder()
@@ -244,6 +247,9 @@ class ForgeBackend(Backend):
             forge_io.write_fmesh(src, arrays.co, sizes, arrays.loop_verts.astype(np.int32),
                                  features, density, request.guides)
 
+            if os.environ.get("FORGE_SAVE_INPUT"):       # developers: keep the exact engine input and command line
+                shutil.copyfile(src, os.environ["FORGE_SAVE_INPUT"])
+                Path(os.environ["FORGE_SAVE_INPUT"] + ".cmd").write_text(" ".join(map(str, build_command(engine, src, dst, request))))
             engine_stats, _report = yield from run_engine_steps(build_command(engine, src, dst, request), request.progress)
             try:
                 request.engine_info.update(json.loads(engine_stats) if engine_stats else {})

@@ -1,3 +1,6 @@
+// Several helpers are kept for the stages still to come (and for tools); do not warn about them.
+#![allow(dead_code)]
+
 //! FORGE command line (Rust port, work in progress).
 mod cli;
 mod io;

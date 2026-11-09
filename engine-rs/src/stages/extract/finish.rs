@@ -8,7 +8,7 @@ use crate::math::Vec3;
 use crate::mesh::bvh::{SegmentIndex, SurfaceIndex};
 use crate::stages::quadopt::{optimize_poles, QuadOptStats};
 use crate::stages::quadquality::{improve_quads, QuadQualityStats};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 fn env_i(name: &str, default: i32) -> i32 { std::env::var(name).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(default) }
 fn env_set(name: &str) -> bool { std::env::var_os(name).is_some() }
@@ -127,6 +127,176 @@ fn relax(s: &mut Quads, nb: &[Vec<i32>], iters: i32, feat: &SegmentIndex, refere
             np[v] = if h.tri >= 0 { h.p } else { p };
         }
         s.p = np;
+    }
+}
+
+
+/// Thin strips: a row of quads whose two across-edges are (almost) zero length. This is what a chamfer or fillet
+/// narrower than one cell turns into on the lattice (both of its feature lines land on the same lattice line).
+/// A closed strip (a ring around a hole, a loop along a rim) is removed: its two sides are welded together. Strips
+/// that are not closed loops are left alone, because welding them would leave triangles behind.
+fn collapse_thin_strips(s: &mut Quads, ratio: f64) {
+    if env_set("FORGE_NOSTRIP") { return; }
+    for _attempt in 0..3 {
+        let nq = s.f.len();
+        // mean edge length
+        let (mut sum, mut cnt) = (0.0, 0usize);
+        for q in &s.f { for k in 0..4 { sum += s.p[q[k] as usize].distance(s.p[q[(k + 1) % 4] as usize]); cnt += 1; } }
+        if cnt == 0 { return; }
+        let thr = ratio * sum / cnt as f64;
+        let short = |q: &[i32; 4], k: usize| s.p[q[k] as usize].distance(s.p[q[(k + 1) % 4] as usize]) < thr;
+        // candidate strip quads: the two opposite short edges are `k` and `k + 2`
+        let mut cand = vec![-1i32; nq]; // k of the first short edge (0 or 1), -1 if not a strip quad
+        for (qi, q) in s.f.iter().enumerate() {
+            let sh = [short(q, 0), short(q, 1), short(q, 2), short(q, 3)];
+            if sh[0] && sh[2] && !sh[1] && !sh[3] { cand[qi] = 0; }
+            else if sh[1] && sh[3] && !sh[0] && !sh[2] { cand[qi] = 1; }
+        }
+        // quads per edge
+        let mut eq: HashMap<u64, Vec<usize>> = HashMap::new();
+        for (qi, q) in s.f.iter().enumerate() { for k in 0..4 { eq.entry(edge_key(q[k], q[(k + 1) % 4])).or_default().push(qi); } }
+        // chains of candidates linked through shared short edges
+        let mut parent: Vec<usize> = (0..nq).collect();
+        fn find(p: &mut Vec<usize>, mut x: usize) -> usize { while p[x] != x { p[x] = p[p[x]]; x = p[x]; } x }
+        let short_edges = |qi: usize| -> [u64; 2] {
+            let q = s.f[qi];
+            let k = cand[qi] as usize;
+            [edge_key(q[k], q[(k + 1) % 4]), edge_key(q[k + 2], q[(k + 3) % 4])]
+        };
+        for qi in 0..nq {
+            if cand[qi] < 0 { continue; }
+            for e in short_edges(qi) {
+                for &o in &eq[&e] { if o != qi && cand[o] >= 0 { let (a, b) = (find(&mut parent, qi), find(&mut parent, o)); parent[a] = b; } }
+            }
+        }
+        // a chain is a closed loop when every one of its short edges is shared by exactly two quads of the chain
+        let mut ok_chain: HashMap<usize, bool> = HashMap::new();
+        for qi in 0..nq {
+            if cand[qi] < 0 { continue; }
+            let r = find(&mut parent, qi);
+            let entry = ok_chain.entry(r).or_insert(true);
+            for e in short_edges(qi) {
+                let list = &eq[&e];
+                if list.len() != 2 || list.iter().any(|&o| cand[o] < 0) { *entry = false; }
+            }
+        }
+        if dbg() {
+            let mut len: HashMap<usize, usize> = HashMap::new();
+            for qi in 0..nq { if cand[qi] >= 0 { *len.entry(find(&mut parent, qi)).or_insert(0) += 1; } }
+            let closed = ok_chain.values().filter(|&&v| v).count();
+            let mut open_len: Vec<usize> = ok_chain.iter().filter(|(_, &v)| !v).map(|(r, _)| len[r]).collect();
+            open_len.sort_unstable();
+            let mut reasons = [0usize; 6];
+            for qi in 0..nq {
+                if cand[qi] < 0 { continue; }
+                let r = find(&mut parent, qi);
+                if ok_chain[&r] { continue; }
+                for e in short_edges(qi) {
+                    let list = &eq[&e];
+                    if list.len() != 2 { reasons[0] += 1; continue; }
+                    for &o in list { if o != qi && cand[o] < 0 {
+                        let ns = (0..4).filter(|&k| short(&s.f[o], k)).count();
+                        reasons[1 + ns.min(4)] += 1;
+                    } }
+                }
+            }
+            eprintln!("open-chain edge neighbours: border/nonmanifold {} | neighbour with 0/1/2/3+ short edges {:?}", reasons[0], &reasons[1..]);
+            eprintln!("strip chains: {} closed, {} open (lengths {:?})", closed, open_len.len(), &open_len[open_len.len().saturating_sub(12)..]);
+        }
+        if !ok_chain.values().any(|&v| v) { return; }
+        let mut dsu: Vec<usize> = (0..s.p.len()).collect();
+        let mut dead = vec![false; nq];
+        let mut vert_chain: HashMap<usize, usize> = HashMap::new();
+        let mut collapsed = 0;
+        for qi in 0..nq {
+            if cand[qi] < 0 { continue; }
+            let r = find(&mut parent, qi);
+            if !ok_chain[&r] { continue; }
+            dead[qi] = true;
+            collapsed += 1;
+            let q = s.f[qi];
+            let k = cand[qi] as usize;
+            for (a, b) in [(q[k], q[(k + 1) % 4]), (q[k + 2], q[(k + 3) % 4])] {
+                let (ra, rb) = (find(&mut dsu, a as usize), find(&mut dsu, b as usize));
+                dsu[ra] = rb;
+                vert_chain.insert(a as usize, r);
+                vert_chain.insert(b as usize, r);
+            }
+        }
+        // rebuild; a surviving quad that now has a repeated vertex means the chain cannot be welded
+        let mut bad_chains: Vec<usize> = Vec::new();
+        for (qi, q) in s.f.iter().enumerate() {
+            if dead[qi] { continue; }
+            let r: Vec<usize> = q.iter().map(|&v| find(&mut dsu, v as usize)).collect();
+            let degenerate = (0..4).any(|i| (i + 1..4).any(|j| r[i] == r[j]));
+            if degenerate { for &v in q { if let Some(&c) = vert_chain.get(&(v as usize)) { bad_chains.push(c); } } }
+        }
+        if !bad_chains.is_empty() {
+            // forbid those chains and try again
+            bad_chains.sort_unstable();
+            bad_chains.dedup();
+            for qi in 0..nq { if cand[qi] >= 0 { let r = find(&mut parent, qi); if bad_chains.contains(&r) { ok_chain.insert(r, false); } } }
+            // recompute with the reduced set
+            dsu = (0..s.p.len()).collect();
+            dead = vec![false; nq];
+            collapsed = 0;
+            for qi in 0..nq {
+                if cand[qi] < 0 { continue; }
+                let r = find(&mut parent, qi);
+                if !ok_chain[&r] { continue; }
+                dead[qi] = true;
+                collapsed += 1;
+                let q = s.f[qi];
+                let k = cand[qi] as usize;
+                for (a, b) in [(q[k], q[(k + 1) % 4]), (q[k + 2], q[(k + 3) % 4])] {
+                    let (ra, rb) = (find(&mut dsu, a as usize), find(&mut dsu, b as usize));
+                    dsu[ra] = rb;
+                }
+            }
+            let mut still_bad = false;
+            for (qi, q) in s.f.iter().enumerate() {
+                if dead[qi] { continue; }
+                let r: Vec<usize> = q.iter().map(|&v| find(&mut dsu, v as usize)).collect();
+                if (0..4).any(|i| (i + 1..4).any(|j| r[i] == r[j])) { still_bad = true; }
+            }
+            if still_bad || collapsed == 0 { return; }
+        }
+        // build the welded mesh
+        let n = s.p.len();
+        let mut acc = vec![Vec3::ZERO; n];
+        let mut cntv = vec![0i32; n];
+        let mut fmax = vec![0u8; n];
+        for v in 0..n { let r = find(&mut dsu, v); acc[r] += s.p[v]; cntv[r] += 1; fmax[r] = fmax[r].max(s.feat[v]); }
+        let mut rid = vec![-1i32; n];
+        let mut np: Vec<Vec3> = Vec::new();
+        let mut nf: Vec<u8> = Vec::new();
+        let mut nq_list: Vec<[i32; 4]> = Vec::new();
+        for (qi, q) in s.f.iter().enumerate() {
+            if dead[qi] { continue; }
+            let mut out = [0i32; 4];
+            for k in 0..4 {
+                let r = find(&mut dsu, q[k] as usize);
+                if rid[r] < 0 { rid[r] = np.len() as i32; np.push(acc[r] / cntv[r] as f64); nf.push(fmax[r]); }
+                out[k] = rid[r];
+            }
+            nq_list.push(out);
+        }
+        // the welded mesh must stay a clean manifold
+        let mut ec: HashMap<u64, i32> = HashMap::new();
+        let mut dir: HashSet<u64> = HashSet::new();
+        let mut clean = true;
+        for q in &nq_list {
+            for k in 0..4 {
+                let (a, b) = (q[k], q[(k + 1) % 4]);
+                *ec.entry(edge_key(a, b)).or_insert(0) += 1;
+                if !dir.insert(((a as u32 as u64) << 32) | b as u32 as u64) { clean = false; }
+            }
+        }
+        if ec.values().any(|&c| c > 2) { clean = false; }
+        if dbg() { eprintln!("thin strips: collapsed {collapsed} quads, clean {clean}"); }
+        if !clean { return; }
+        *s = Quads { p: np, f: nq_list, feat: nf };
+        if collapsed == 0 { return; }
     }
 }
 
@@ -349,6 +519,14 @@ pub fn finish(poly: &PolyMesh, cfeat: &[u8], feat: &SegmentIndex, reference: &Su
         if dbg() { eprintln!("pole opt: moves {} cost {} -> {}", qo.moves, qo.pole_cost_before, qo.pole_cost_after); }
         nb = s.neighbours();
         relax(&mut s, &nb, prm.final_smooth, feat, reference);
+    }
+    {
+        let before = s.f.len();
+        collapse_thin_strips(&mut s, env_i("FORGE_STRIPPCT", 25) as f64 / 100.0);
+        if s.f.len() != before {
+            nb = s.neighbours();
+            relax(&mut s, &nb, prm.final_smooth / 2, feat, reference);
+        }
     }
     merge_dead_ends(&mut s);
     replace_stars(&mut s, reference);

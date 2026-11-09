@@ -23,6 +23,7 @@ use crate::stages::field::FaceFrames;
 use crate::math::Cplx;
 use crate::util::parallel::par_fill;
 use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Instant;
 
 pub type Progress = Box<dyn Fn(i32, &str) + Sync>;
@@ -347,6 +348,129 @@ impl Topology {
     }
 }
 
+
+// ------------------------------------------------------------------------------------------------ parallel CG
+
+/// Raw pointer that may be shared between the threads of the team (each thread only writes its own chunk).
+#[derive(Clone, Copy)]
+struct Shared(*mut f64);
+unsafe impl Sync for Shared {}
+unsafe impl Send for Shared {}
+impl Shared {
+    #[inline] unsafe fn get(&self, i: usize) -> f64 { *self.0.add(i) }
+    #[inline] unsafe fn set(&self, i: usize, v: f64) { *self.0.add(i) = v; }
+}
+
+/// Reusable spinning barrier for a fixed team of threads.
+struct Barrier { count: AtomicI32, gen: AtomicI32, n: i32 }
+impl Barrier {
+    fn new(n: usize) -> Self { Barrier { count: AtomicI32::new(0), gen: AtomicI32::new(0), n: n as i32 } }
+    fn wait(&self) {
+        let g = self.gen.load(Ordering::Acquire);
+        if self.count.fetch_add(1, Ordering::AcqRel) + 1 == self.n {
+            self.count.store(0, Ordering::Relaxed);
+            self.gen.fetch_add(1, Ordering::AcqRel);
+        } else {
+            let mut spins = 0;
+            while self.gen.load(Ordering::Acquire) == g {
+                spins += 1;
+                if spins > 2000 { std::thread::yield_now(); }
+            }
+        }
+    }
+}
+
+/// Jacobi preconditioned conjugate gradient with the whole iteration run by a team of threads (rows are split in
+/// fixed chunks, so the result does not depend on timing).
+fn parallel_cg(k: &Csr, b: &[f64], x: &mut [f64], fixed: &[bool], diag: &[f64], max_iter: usize, tol: f64, threads: usize) -> usize {
+    let n = x.len();
+    let t_n = threads.max(1);
+    let mut r = vec![0.0f64; n];
+    let mut p = vec![0.0f64; n];
+    let mut ap = vec![0.0f64; n];
+    let mut zv = vec![0.0f64; n];
+    let mut part_a = vec![0.0f64; t_n * 8];
+    let mut part_b = vec![0.0f64; t_n * 8];
+    let mut part_c = vec![0.0f64; t_n * 8];
+    let mut part_d = vec![0.0f64; t_n * 8];
+    let bar = Barrier::new(t_n);
+    let its_done = AtomicI32::new(0);
+    let chunk = n.div_ceil(t_n);
+    let (xs, rs, ps, aps, zs) = (Shared(x.as_mut_ptr()), Shared(r.as_mut_ptr()), Shared(p.as_mut_ptr()), Shared(ap.as_mut_ptr()), Shared(zv.as_mut_ptr()));
+    let (pa, pb, pc, pd) = (Shared(part_a.as_mut_ptr()), Shared(part_b.as_mut_ptr()), Shared(part_c.as_mut_ptr()), Shared(part_d.as_mut_ptr()));
+    let worker = |t: usize| unsafe {
+        let rb = n.min(t * chunk);
+        let re = n.min(rb + chunk);
+        let mut bn = 0.0;
+        for i in rb..re {
+            let mut s = 0.0;
+            for kk in k.start[i] as usize..k.start[i + 1] as usize { s += k.val[kk] * xs.get(k.col[kk] as usize); }
+            if fixed[i] { rs.set(i, 0.0); zs.set(i, 0.0); ps.set(i, 0.0); continue; }
+            rs.set(i, b[i] - s);
+            bn += b[i] * b[i];
+        }
+        pa.set(t * 8, bn);
+        bar.wait();
+        let mut bnorm = 0.0;
+        for q in 0..t_n { bnorm += pa.get(q * 8); }
+        let mut rzl = 0.0;
+        for i in rb..re {
+            if fixed[i] { continue; }
+            zs.set(i, rs.get(i) / diag[i]);
+            ps.set(i, zs.get(i));
+            rzl += rs.get(i) * zs.get(i);
+        }
+        pb.set(t * 8, rzl);
+        bar.wait();
+        let mut rz = 0.0;
+        for q in 0..t_n { rz += pb.get(q * 8); }
+        if rz < 1e-300 { if t == 0 { its_done.store(0, Ordering::Relaxed); } return; }
+        let mut it = 0usize;
+        while it < max_iter {
+            let mut pap = 0.0;
+            for i in rb..re {
+                let mut s = 0.0;
+                for kk in k.start[i] as usize..k.start[i + 1] as usize { s += k.val[kk] * ps.get(k.col[kk] as usize); }
+                if fixed[i] { s = 0.0; }
+                aps.set(i, s);
+                pap += ps.get(i) * s;
+            }
+            pc.set(t * 8, pap);
+            bar.wait();
+            let mut tot = 0.0;
+            for q in 0..t_n { tot += pc.get(q * 8); }
+            if tot.abs() < 1e-300 { break; }
+            let alpha = rz / tot;
+            let (mut rn, mut rz_new) = (0.0, 0.0);
+            for i in rb..re {
+                if fixed[i] { continue; }
+                xs.set(i, xs.get(i) + alpha * ps.get(i));
+                rs.set(i, rs.get(i) - alpha * aps.get(i));
+                rn += rs.get(i) * rs.get(i);
+                zs.set(i, rs.get(i) / diag[i]);
+                rz_new += rs.get(i) * zs.get(i);
+            }
+            pd.set(t * 8, rn);
+            pb.set(t * 8, rz_new);
+            bar.wait();
+            let (mut rn_t, mut rz_t) = (0.0, 0.0);
+            for q in 0..t_n { rn_t += pd.get(q * 8); rz_t += pb.get(q * 8); }
+            if rn_t <= tol * tol * bnorm.max(1.0) { it += 1; break; }
+            let beta = rz_t / rz;
+            rz = rz_t;
+            for i in rb..re { ps.set(i, if fixed[i] { 0.0 } else { zs.get(i) + beta * ps.get(i) }); }
+            bar.wait();
+            it += 1;
+        }
+        if t == 0 { its_done.store(it as i32, Ordering::Relaxed); }
+    };
+    std::thread::scope(|sc| {
+        for t in 1..t_n { let w = &worker; sc.spawn(move || w(t)); }
+        worker(0);
+    });
+    its_done.load(Ordering::Relaxed) as usize
+}
+
 // ------------------------------------------------------------------------------------------------ system
 
 pub struct IntegerParam<'a> {
@@ -412,7 +536,11 @@ impl<'a> Param<'a> {
     fn do_solve(&mut self, max_iter: usize, tol: f64) -> usize {
         self.solves += 1;
         let n = self.x.len();
-        let threads = if !self.use_amg && self.prm.threads > 1 && n >= 40000 { self.prm.threads.min(1 + n / 20000) } else { 1 };
+        if !self.use_amg && self.prm.threads > 1 && n >= 40000 {
+            let t = self.prm.threads.min(1 + n / 20000);
+            return parallel_cg(&self.k, &self.rhs, &mut self.x, &self.fixed, &self.diag, max_iter, tol, t);
+        }
+        let threads = 1;
         let (k, fixed, diag, b) = (&self.k, &self.fixed, &self.diag, &self.rhs);
         let matvec = |v: &[f64], out: &mut Vec<f64>| {
             par_fill(out, threads, |i| {

@@ -6,3 +6,4 @@ tests/out/
 *.zip
 engine/bin/
 engine-rs/target/
+engine-rs/bin/
