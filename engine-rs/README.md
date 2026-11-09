@@ -33,3 +33,15 @@ thinner than one cell and the hole-filling stars, see `../quadforge/docs/`.
 
 Not ported on purpose: experimental seam repair (`FORGE_SEAMFIX`) and the cell-size retry (`FORGE_RETRY`), both off by
 default in C++.
+
+## Tuning switches (development)
+
+| Variable | Effect |
+|---|---|
+| `FORGE_THINFEAT=<cells>` | Marked lines closer than this (default 1.0 cell) to another run of marked edges: the shorter run is left unmarked (`pipeline.rs`, `long_feature_chains`). `0` disables. |
+| `FORGE_NOLADDER=1` | Subdivide 6+ sided hole polygons as a centroid star again instead of a quad ladder (`stages/extract/finish.rs`, `subdivide_polygons`). |
+| `FORGE_NOSTRIP`, `FORGE_STRIPPCT` | Closed thin-strip collapse off / threshold (percent of a cell). |
+| `FORGE_NOSTAR`, `FORGE_STARMIN` | Star replacement off / minimum valence. |
+
+Known limit: a few quads with coincident vertices remain on hard-surface plates (also present in the C++ engine).
+Welding them after extraction was tried and rejected: it breaks the closed-mesh check and triggers the fallback.
