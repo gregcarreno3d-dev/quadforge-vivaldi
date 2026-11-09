@@ -3,14 +3,9 @@
 //!   forge remesh --in a.fmesh --out b.fmesh --faces 20000 [--mode tri|quad] [--threads N] ...
 //!
 //! Work areas: `Options::parse` (flags) · `run_remesh` (the pipeline order) · stdout protocol in `util::protocol`.
-use crate::io::fmesh;
-use crate::mesh::bvh::SegmentIndex;
-use crate::stages::metrics::metrics_json;
-use crate::stages::quad::{QuadParams, QuadStats, Quadifier};
-use crate::stages::remesh::{RemeshParams, RemeshStats, Remesher};
-use crate::stages::{capping, repair};
+use crate::pipeline;
 use crate::util::parallel::default_threads;
-use crate::util::protocol::{json_safe, say};
+use crate::util::protocol::say;
 
 pub const USAGE: &str = "usage: forge remesh --in FILE --out FILE --faces N [--mode tri|quad] [--threads N]\n\
               [--no-project] [--no-retry] [--corner-angle DEG] [--iterations N] [--stats] [--check]";
@@ -33,6 +28,18 @@ pub struct Options {
     pub pole_sweeps: i32,
     pub cycle_pairs: i32,
     pub quad_method: String,
+    pub no_retry: bool,
+    pub with_retry: bool,
+    pub use_param: bool,
+    pub align_feat: bool,
+    pub adaptive: bool,
+    pub time_limit: f64,
+    pub adapt_ratio: f64,
+    pub adapt_min: f64,
+    pub curv_angle: f64,
+    pub ex_subdiv: bool,
+    pub ex_iters: i32,
+    pub ex_density: f64,
 }
 
 impl Options {
@@ -41,6 +48,8 @@ impl Options {
             input: String::new(), output: String::new(), mode: "tri".into(), target_faces: 0, threads: default_threads(),
             project: true, corner_angle_deg: 35.0, iterations: 8, stats: false, check: false, relax_iters: 30,
             field_align: 0.5, use_field: true, pole_weight: 10.0, pole_sweeps: 150, cycle_pairs: 5, quad_method: "auto".into(),
+            no_retry: false, with_retry: false, use_param: true, align_feat: true, adaptive: true, time_limit: 900.0,
+            adapt_ratio: 1.3, adapt_min: 0.5, curv_angle: 0.0, ex_subdiv: true, ex_iters: 60, ex_density: 6.0,
         };
         let mut i = 2;
         while i < args.len() {
@@ -64,9 +73,18 @@ impl Options {
                 "--pole-sweeps" => o.pole_sweeps = next().parse().unwrap_or(150),
                 "--cycle-pairs" => o.cycle_pairs = next().parse().unwrap_or(5),
                 "--quad-method" => o.quad_method = next(),
-                // accepted for compatibility with the C++ engine; the grid route is not ported yet
-                "--no-retry" | "--retry" | "--no-param" | "--no-align" | "--no-adaptive" => {}
-                "--ex-subdiv" | "--ex-iters" | "--ex-density" | "--time-limit" | "--adaptive-ratio" | "--adaptive-min" | "--curv-adapt" => { next(); }
+                "--no-retry" => o.no_retry = true,
+                "--retry" => o.with_retry = true,
+                "--no-param" => o.use_param = false,
+                "--no-align" => o.align_feat = false,
+                "--no-adaptive" => o.adaptive = false,
+                "--ex-subdiv" => o.ex_subdiv = next().parse::<i32>().unwrap_or(1) != 0,
+                "--ex-iters" => o.ex_iters = next().parse().unwrap_or(60),
+                "--ex-density" => o.ex_density = next().parse().unwrap_or(6.0),
+                "--time-limit" => o.time_limit = next().parse().unwrap_or(900.0),
+                "--adaptive-ratio" => o.adapt_ratio = next().parse().unwrap_or(1.3),
+                "--adaptive-min" => o.adapt_min = next().parse().unwrap_or(0.5),
+                "--curv-adapt" => o.curv_angle = next().parse().unwrap_or(0.0),
                 _ => return Err(USAGE.into()),
             }
             i += 1;
@@ -82,63 +100,15 @@ pub fn run_remesh(args: &[String]) -> i32 {
         Ok(o) => o,
         Err(u) => { println!("{u}"); return 1; }
     };
-    match remesh(&o) {
-        Ok(()) => { say("OK", ""); 0 }
-        Err(e) => { say("ERR", &e); 2 }
+    // The grid route may ask for a second run without the thin-part refinement (exit code 3 in the C++ engine).
+    let mut rc = pipeline::run(&o, false);
+    if rc == pipeline::Outcome::Retry {
+        if std::env::var_os("FORGE_DBG").is_some() { eprintln!("grid method failed with thickness refinement: running again without it"); }
+        rc = pipeline::run(&o, true);
     }
-}
-
-fn remesh(o: &Options) -> Result<(), String> {
-    let progress = || -> crate::stages::remesh::ProgressFn { Box::new(|p, m| say("P", &format!("{p} {m}"))) };
-    say("P", "2 Reading");
-    let input = fmesh::read(&o.input)?;
-    say("P", "6 Checking the mesh");
-    let mut rep = repair::RepairReport::default();
-    let mut soup = repair::repair_mesh(&input, &mut rep);
-    say("R", &rep.to_json(soup.f.len()));
-    let quad_mode = o.mode == "quad";
-    let stitched = capping::stitch_slits(&mut soup);
-    if stitched > 0 && std::env::var_os("FORGE_DBG").is_some() { eprintln!("removed {stitched} flat sliver triangles"); }
-    let requested = o.target_faces;
-    // Grid route (integer-grid parametrization): not ported yet, so quad mode always uses the pairing route.
-    let fallback_reason = if !quad_mode { String::new() } else { "grid method not available in this build".to_string() };
-    let used_method = if quad_mode { "pair" } else { "tri" };
-    let pair_target = (requested / 2).max(4); // every pair of triangles becomes 4 quads
-    let prm = RemeshParams {
-        target_faces: if quad_mode { pair_target } else { requested }, iterations: o.iterations, threads: o.threads,
-        project: o.project, corner_angle_deg: o.corner_angle_deg, check: o.check, progress: Some(progress()), ..RemeshParams::default()
-    };
-    let mut rem = Remesher::new(&soup, prm);
-    let mut result = fmesh::PolyMesh::default();
-    let mut st = RemeshStats::default();
-    if !rem.run(&mut result, &mut st) {
-        return Err(if st.error.is_empty() { "remesh failed".into() } else { st.error.clone() });
+    match rc {
+        pipeline::Outcome::Done => { say("OK", ""); 0 }
+        pipeline::Outcome::Failed(e) => { say("ERR", &e); 2 }
+        pipeline::Outcome::Retry => { say("ERR", "grid retry failed"); 2 }
     }
-    let mut qs = QuadStats::default();
-    if quad_mode {
-        let qp = QuadParams {
-            threads: o.threads, project: o.project, progress: Some(progress()), relax_iterations: o.relax_iters,
-            field_align: o.field_align, use_field: o.use_field, pole_weight: o.pole_weight, pole_sweeps: o.pole_sweeps,
-            cycle_pairs: o.cycle_pairs, ..QuadParams::default()
-        };
-        let mut quad = Quadifier::new(&rem.mesh, &rem.reference, &rem.feature_lines, rem.base_length, qp);
-        let mut quads = fmesh::PolyMesh::default();
-        quad.run(&mut quads, &mut qs)?;
-        result = quads;
-    }
-    fmesh::write(&o.output, &result)?;
-    if o.stats {
-        let mut js = metrics_json(&result, Some(&rem.reference));
-        js.pop(); // closing brace
-        js.push_str(&format!(
-            ",\"method\":\"{}\",\"closed_holes\":0,\"removed_slivers\":{},\"density_note\":\"\",\"fallback\":\"{}\",\"seconds\":{:.6},\
-\"edge_length\":{:.6},\"rounds\":{},\"pairs\":{},\"leftover_tris\":{},\"field_s\":{:.6},\"match_s\":{:.6},\"relax_s\":{:.6},\
-\"irregular_before\":{},\"irregular_after\":{}}}",
-            used_method, stitched, json_safe(&fallback_reason), st.seconds, st.edge_length, st.rounds, qs.pairs, qs.leftover,
-            qs.field_seconds, qs.match_seconds, qs.relax_seconds, qs.irregular_before, qs.irregular_after
-        ));
-        say("S", &js);
-    }
-    let _ = SegmentIndex::default;
-    Ok(())
 }

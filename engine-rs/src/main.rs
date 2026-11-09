@@ -3,6 +3,7 @@ mod cli;
 mod io;
 mod math;
 mod mesh;
+mod pipeline;
 mod stages;
 mod util;
 

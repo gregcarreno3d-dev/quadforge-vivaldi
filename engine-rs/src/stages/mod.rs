@@ -1,6 +1,10 @@
+pub mod amg;
+pub mod borderweld;
 pub mod capping;
+pub mod extract;
 pub mod field;
 pub mod metrics;
+pub mod param;
 pub mod quad;
 pub mod quadopt;
 pub mod quadquality;
