@@ -98,6 +98,11 @@ Open borders: the engine closes every border loop with a cap, treats the loop as
   seam) are repaired by the add-on; a gap of 14 or more edges is not (it needs a hole larger than the 12-side fill limit).
   The matrix test therefore reports but does not block the build. If you see "The centre seam has N open edges",
   try a slightly different target count or a larger Weld Distance, and please open an issue with the model.
+- **Face Sets can differ from materials on one boundary face.** Once, on the Blender 4.2 runner, the zones test check
+  "Face Sets copied and agree with materials" failed on the first run and passed on the rerun; it never failed in
+  about 15 local runs (sizes 480 to 740, 1 to 8 threads, Blender 4.2 and 5.2, both engines). Materials and Face Sets are
+  copied by two separate nearest-face lookups (`detail.copy_face_data` and `zonedata.copy_sculpt_data`), so a face
+  whose centre lies exactly between two zones can be given one zone by each. It is cosmetic (one face of a zone border).
 
 ## Suggested roadmap
 0.5.x: fixes after the author's tests. 0.6: lattice extraction. 0.7: integer-grid parametrization. 0.8: alignment to hard edges. Next: borders, a faster solver, thin-part handling. Then the Rust port (parallel version) and publishing.
