@@ -163,6 +163,7 @@ def cut_result_to_half(mesh, plan: SymmetryPlan) -> None:
     try:
         bm.from_mesh(mesh)
         for axis in plan.axes:
+            snap_straddling_corners(bm, axis, plan.plane_offsets[axis], max(plan.tolerance, 1e-6))
             cut_mesh_to_half(bm, axis, plan.plane_offsets[axis], plan.kept_sides[axis], plan.tolerance)
             # a quad lying flat ON the plane (the engine can make one where the surface just touches it)
             # would be doubled by the mirror and leave a non-manifold edge: it carries no area, drop it
@@ -211,6 +212,33 @@ def snap_vertices_to_plane(bm: bmesh.types.BMesh, axis: int, plane_offset: float
         if abs(vertex.co[axis] - plane_offset) <= tolerance and vertex.co[axis] != plane_offset:
             vertex.co[axis] = plane_offset
             moved += 1
+    return moved
+
+
+def snap_straddling_corners(bm: bmesh.types.BMesh, axis: int, plane_offset: float, reach: float) -> int:
+    """Pull a corner that sits just across the plane onto it, for quads the plane touches at another corner.
+
+    A quad with one corner on the plane and the rest on both sides would be cut into a triangle and a quad (and the
+    triangle would be mirrored too). Its lone corner on the far side is moved onto the plane when it is within half an
+    edge length of it: the quad then simply has two corners on the plane. Returns how many corners moved.
+    """
+    moved = 0
+    for face in list(bm.faces):
+        d = [vertex.co[axis] - plane_offset for vertex in face.verts]
+        if not any(abs(x) <= reach for x in d):
+            continue
+        pos = [i for i, x in enumerate(d) if x > reach]
+        neg = [i for i, x in enumerate(d) if x < -reach]
+        if not pos or not neg:
+            continue
+        group = pos if (len(pos), max(d[i] for i in pos)) < (len(neg), max(-d[i] for i in neg)) else neg
+        mean_edge = sum(edge.calc_length() for edge in face.edges) / len(face.edges)
+        if max(abs(d[i]) for i in group) <= 0.5 * mean_edge:
+            for i in group:
+                vertex = face.verts[i]
+                if vertex.co[axis] != plane_offset:
+                    vertex.co[axis] = plane_offset
+                    moved += 1
     return moved
 
 

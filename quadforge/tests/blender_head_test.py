@@ -133,7 +133,8 @@ for target in (2000, 8000, 30000):
                 and error < 0.12 and p1 > 0.3 and float(jac.mean()) > 0.9)
         print(("PASS" if good else "FAIL"),
               f"[wire {wire} loose {loose} flat {flat} seam-corners {corners}] head {target:>5} guides {'on ' if guides else 'off'}: faces {st['faces']} ({100 * error:.1f}% off), "
-              f"Jacobian mean {jac.mean():.3f} p1 {p1:.2f}, rows along the loops {100 * frac:.0f}% ({n} edges)")
+              f"Jacobian mean {jac.mean():.3f} p1 {p1:.2f}, rows along the loops {100 * frac:.0f}% ({n} edges)"
+              + ("" if good else f" [border {st['border_edges']} non-manifold {st['non_manifold_edges']} quads {st['quads']}/{st['faces']}]"))
         ok &= good
 print("ALL PASSED" if ok else "FAILED")
 sys.exit(0 if ok else 1)
