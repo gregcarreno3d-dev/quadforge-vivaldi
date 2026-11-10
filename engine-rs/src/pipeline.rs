@@ -449,6 +449,12 @@ fn grid_route(o: &Options, rem: &Remesher, soup: &TriSoup, free_soup: &TriSoup, 
         let r = next_rho(ex.prm.rho, ratio, &tried, requested as f64);
         ex.set_rho(r);
     }
+    if any && !capped && best_err > 0.25 && !fallback_reason.is_empty() {
+        // a later pass failed outright and the one that closed is far from the count: do not hand that result over
+        // (the caller retries without the thickness refinement, or uses the pairing path)
+        if dbg() { eprintln!("grid failed and the closed pass is off by {:.0}%, discarding it", 100.0 * best_err); }
+        any = false;
+    }
     if any && capped && best_err > 0.25 {
         // the capped surface did not give a usable result at this size: use the pairing path instead
         if dbg() { eprintln!("capped extraction off by {:.0}%, falling back", 100.0 * best_err); }
