@@ -7,7 +7,7 @@ on:
 
 jobs:
   engine:
-    name: Engine ${{ matrix.name }}
+    name: C++ reference engine ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -84,11 +84,11 @@ jobs:
         with: { python-version: "3.13" }
       - name: Install
         run: python -m pip install ziglang numpy scikit-image bpy
-      - name: Build Linux engine
+      - name: Build Linux engine (Rust)
         run: |
-          python tools/build.py linux
+          python tools/build_rust.py
           mkdir -p quadforge/bin/linux
-          cp engine/bin/linux/forge quadforge/bin/linux/forge
+          cp engine-rs/bin/linux/forge quadforge/bin/linux/forge
       - name: Add-on tests
         run: |
           python quadforge/tests/blender_forge_test.py
@@ -116,11 +116,11 @@ jobs:
         with: { python-version: "${{ matrix.python }}" }
       - name: Install
         run: python -m pip install ziglang numpy scipy scikit-image bpy==${{ matrix.blender }}
-      - name: Build Linux engine
+      - name: Build Linux engine (Rust)
         run: |
-          python tools/build.py linux
+          python tools/build_rust.py
           mkdir -p quadforge/bin/linux
-          cp engine/bin/linux/forge quadforge/bin/linux/forge
+          cp engine-rs/bin/linux/forge quadforge/bin/linux/forge
       # run_in_bpy.py ends the process with os._exit: the bpy module can crash or hang at interpreter shutdown on 4.2 and 4.5.
       - name: Add-on tests
         run: |

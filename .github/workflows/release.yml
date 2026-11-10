@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag such as v0.11.0 (or run the workflow by hand) and this builds the engine on all four platforms,
+# Push a tag such as v0.11.0 (or run the workflow by hand) and this builds the Rust engine on all four platforms,
 # packages the zips and publishes the GitHub release with them attached.
 on:
   push:
@@ -30,17 +30,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - run: python -m pip install ziglang numpy scikit-image
-      - run: python tools/build.py ${{ matrix.name }}
+      - run: python -m pip install numpy scikit-image
+      - name: Build the Rust engine natively
+        run: python tools/build_rust.py
       - name: Engine hard cases (29 models)
         shell: bash
         env:
-          FORGE_ENGINE: ${{ github.workspace }}/engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+          FORGE_ENGINE: ${{ github.workspace }}/engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
         run: python quadforge/devtools/engine_tests/t08_hard_cases.py
+      - name: Engine robustness (quick)
+        shell: bash
+        env:
+          FORGE_ENGINE: ${{ github.workspace }}/engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
+        run: python quadforge/devtools/engine_tests/t07_robustness.py --quick
       - uses: actions/upload-artifact@v4
         with:
           name: forge-${{ matrix.name }}
-          path: engine/bin/${{ matrix.name }}/${{ matrix.exe }}
+          path: engine-rs/bin/${{ matrix.name }}/${{ matrix.exe }}
 
   release:
     name: Package and publish

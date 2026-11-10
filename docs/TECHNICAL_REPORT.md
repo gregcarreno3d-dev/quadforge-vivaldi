@@ -475,14 +475,14 @@ that always returns a valid mesh (or a clear explanation of why not).
 ## 10. Reproducing everything
 
 ```bash
-# build the engine (needs: pip install ziglang numpy scikit-image)
-python3 tools/build.py linux                 # or windows | macos-arm64 | macos-x64; writes engine/bin/<platform>/
+# build the engine (needs cargo; plus pip install numpy scikit-image for the tests)
+python3 tools/build_rust.py                  # writes engine-rs/bin/<platform>/ for this computer
 
 # run it on a file (the .fmesh format is described in docs/ARCHITECTURE_FOR_AI.md)
-engine/bin/linux/forge remesh --in model.fmesh --out out.fmesh --faces 20000 --mode quad --stats
+engine-rs/bin/linux/forge remesh --in model.fmesh --out out.fmesh --faces 20000 --mode quad --stats
 
 # engine tests
-export FORGE_ENGINE=$PWD/engine/bin/linux/forge
+export FORGE_ENGINE=$PWD/engine-rs/bin/linux/forge
 python3 quadforge/devtools/engine_tests/t08_hard_cases.py        # 25 hard cases
 python3 quadforge/devtools/engine_tests/t07_robustness.py --quick # 41 generated cases
 

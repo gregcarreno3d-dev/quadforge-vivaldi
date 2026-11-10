@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.15.0 - 2026-11-10
+
+New
+- **The FORGE engine is now written in Rust.** A full port of the C++ engine, stage by stage, with the same `.fmesh` format and the same stdout protocol, so the add-on needed no change. The code is organised by work area (`engine-rs/README.md` is the map: repair, size fields, remesh, cross field, parametrization, extraction, finishing). It is built natively on Windows, Linux and both Macs. The C++ engine stays in the repository as a reference but is no longer shipped.
+- **Big hole patches are cut into quad ladders** instead of centroid stars. A hole polygon with six or more sides used to become one pole of valence 6 to 12; now it is a strip of quads and no pole above 7 remains on the ant test (minimum angle 20 to 38 degrees).
+- **Two marked lines closer than about three quarters of a cell** (the two edges of a narrow chamfer) are no longer both used as lattice rows; the longer one wins. On the cylinder test with thin chamfers the quads with a bad angle fell from 7,184 to 4,893 at 120,000 faces.
+- **Closed loops of thin quads are collapsed** (strips that end in no triangles), which removes about 40 % of the badly shaped quads at 20,000 faces on the same test.
+- Faster linear solver and a parallel conjugate-gradient team for big meshes: the 120,000-face cylinder test takes 38 s (the C++ engine took 66 s). Small meshes are 10 to 20 % slower than the C++ engine.
+
+Fixed
+- Isotropic remeshing no longer joins two border vertices with a chord, which could leave a flat triangle on the symmetry plane and an open seam after mirroring.
+- A grid pass that closes far from the requested count is dropped when the next pass fails outright, so the engine retries without the thickness refinement instead of returning a mesh with a third of the faces.
+- The flow-guide test compares against the mean of three sizes instead of one lucky size (the threshold is unchanged).
+
 ## 0.14.0 - 2026-11-07
 
 New

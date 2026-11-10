@@ -4,7 +4,7 @@ Technical document for developers and AIs. Everything described exists in this p
 
 ## 1. Overview
 ```
-Blender (Python)                                   Separate process (C++)
+Blender (Python)                                   Separate process (Rust)
 ────────────────                                   ──────────────────────
 UI/properties → pipeline.run()                     bin/<system>/forge remesh ...
    stages 1-9  → backends/forge.py ──.fmesh──►      repair → isotropic remesh → (quads)
@@ -42,7 +42,7 @@ stdout, one line at a time: `P <percent> <message>`, `R <repair report json>`, `
 ## 5. `.fmesh` format (little endian; `core/forge_io.py`, `engine_src/meshio.hpp`)
 `"FMSH"`, u32 version=1, nV, nPoly, nIdx, nFeat, flags (bit0 = density present); then f32 positions[3·nV], i32 polygon sizes[nPoly], i32 indices[nIdx], i32 hard edges[2·nFeat], f32 density[nV] if flags&1.
 
-## 6. Engine (`engine_src/`, C++17)
+## 6. Engine (`engine-rs/`, Rust; the stages and thresholds below were first written in C++17 and are the same)
 | File | Role |
 |---|---|
 | `vec.hpp`, `bvh.hpp` | Vectors, closest point on triangle, surface and segment BVH (reprojection). |

@@ -1,6 +1,6 @@
 # QuadForge Vivaldi
 
-A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own C++ engine.
+A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust.
 
 ![Examples: an organic head at 20K quads, a hard-surface flange at 5K quads with creases kept, and the same flange without hard-edge detection](docs/images/examples.png)
 
@@ -90,7 +90,8 @@ if something fails.
 ## Folders
 
 - `quadforge/` the add-on (Python) and its documentation
-- `engine/` the FORGE engine source (C++17)
+- `engine-rs/` the FORGE engine source (Rust, no dependencies; `engine-rs/README.md` maps every work area to its file)
+- `engine/` the original C++17 engine, kept as a reference and reserve (not shipped)
 - `docs/` technical report, architecture for AI assistants, figures
 - `tests/`, `tools/` tests, build scripts and quality metrics
 

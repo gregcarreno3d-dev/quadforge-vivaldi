@@ -1,6 +1,6 @@
 # FORGE engine (0.14.0)
 
-QuadForge's own remeshing engine. C++17 program with no dependencies, built for Windows, Linux and macOS (arm64 and x64) with Zig. Source is in `engine_src/` (`python engine_src/build.py` rebuilds it; needs `pip install ziglang`).
+QuadForge's own remeshing engine. Since 0.15.0 it is a Rust program with no dependencies (standard library only), built natively by GitHub Actions on Windows, Linux and macOS (arm64 and x64). Source: `engine-rs/` in the repository (`engine_src_rs/` inside the zip); the work-area map is in `engine-rs/README.md`. The original C++17 engine (`engine_src/`) is kept as a reference and is no longer shipped (`python engine_src/build.py` rebuilds it; needs `pip install ziglang`).
 
 ## How it works
 1. The add-on writes the mesh to an `.fmesh` file (positions, polygons, hard edges, optional density).

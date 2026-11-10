@@ -32,7 +32,7 @@ core/backends/          engines: forge.py (own engine)
 core/forge_io.py        .fmesh format (exchange with the engine)
 core/mesh_io.py geometry.py symmetry.py features.py detail.py profiling.py   NumPy/Blender utilities
 bin/<system>/forge      engine executable: windows, linux, macos-arm64, macos-x64
-engine_src/             C++ engine source + build.py (rebuild with Zig)
+engine_src/             original C++ engine source (reference); the shipped Rust engine source is in engine_src_rs/ inside the zip (engine-rs/ in the repository)
 devtools/               packager, engine tests, STL reader
 docs/                   documentation (see below)
 tests/                  tests (no Blender needed except blender_integration_test.py)

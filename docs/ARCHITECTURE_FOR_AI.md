@@ -11,7 +11,7 @@ independent, names are exact, and each claim says where to verify it. A readable
 
 QuadForge is a Blender add-on (Blender 4.2+, tested on 5.2) that remeshes a mesh to quads (or triangles) with a target
 face count. It has two parts: a **Python add-on** (`quadforge/`) that reads the mesh, decides constraints and builds the
-result objects, and **FORGE**, a dependency-free **C++17 command-line engine** (`engine/src/`) that does the geometry
+result objects, and **FORGE**, a dependency-free **Rust command-line engine** (`engine-rs/src/`; the older C++17 engine in `engine/src/` is kept as a reference) that does the geometry
 and runs as a **separate process**. The default quad method is: repair → isotropic triangle remesh (about 6 triangles
 per lattice cell) → smooth 4-direction cross field → seamless integer-grid parametrization → quad extraction by
 vertex snapping → 2×2 subdivision and relaxation. If that fails, the engine falls back to triangle pairing. The add-on
@@ -54,7 +54,8 @@ quadforge/                    the add-on (this folder is what Blender installs)
   tests/                      Blender integration tests (run with the bpy module) and pure-Python tests
   devtools/                   engine test suites (engine_tests/), helpers
   docs/                       user guide, decisions, status and limits, benchmark protocol
-engine/src/                   FORGE engine source (C++17, header-only modules + main.cpp)
+engine-rs/src/                FORGE engine source (Rust; see engine-rs/README.md for the work-area map)
+engine/src/                   original C++17 engine (reference, not shipped)
 tools/                        build.py (Zig cross-compiler), package.py, make_delivery.py, quality_metrics.py,
                               meshgen.py (synthetic meshes), fmesh.py, stlio.py, harness.py
 tests/                        early engine tests t01..t05
@@ -305,10 +306,11 @@ on, Detail on Curves off) and **Organic**. Presets set target and angle and neve
 | Pure Python | `test_features.py`, `test_geometry.py`, `test_planning.py`, `test_guidance.py`, `test_forge_backend.py` | no Blender needed (the last one runs the real engine) |
 | Metrics | `tools/quality_metrics.py` | scaled Jacobian, irregular share, distance to source |
 
-Run the engine tests like this (from the repository root, after `python3 tools/build.py linux`):
+Run the engine tests like this (from the repository root, after `python3 tools/build_rust.py`):
 
 ```bash
-export FORGE_ENGINE=$PWD/engine/bin/linux/forge
+cargo test --release --manifest-path engine-rs/Cargo.toml
+export FORGE_ENGINE=$PWD/engine-rs/bin/linux/forge
 python3 quadforge/devtools/engine_tests/t08_hard_cases.py
 python3 quadforge/devtools/engine_tests/t07_robustness.py --quick
 ```
@@ -317,8 +319,8 @@ Engine tests read the engine path from `FORGE_ENGINE`. Debug output: `FORGE_DBG=
 `FORGE_DBG_ECHO=1` (add-on echoes it). Switches for experiments: `FORGE_NOPARAM`, `FORGE_NOCAP`, `FORGE_NOADAPT`,
 `FORGE_NOQQ`, `FORGE_NOMERGE2`, `FORGE_AMG`, `FORGE_POLEMOVES`.
 
-Build and package: `python3 tools/build.py [platform]` (Zig; no other toolchain), copy `engine/src` into
-`quadforge/engine_src`, copy binaries into `quadforge/bin/<platform>/`, `python3 tools/package.py` for the per-platform
+Build and package: `python3 tools/build_rust.py` (cargo; builds for the computer it runs on, GitHub Actions builds each
+platform on its own runner), copy the binary into `quadforge/bin/<platform>/`, `python3 tools/package.py` for the per-platform
 zips (they pass Blender's `blender_ext.py validate`).
 
 ## 9. Glossary

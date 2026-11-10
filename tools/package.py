@@ -50,6 +50,15 @@ def build(name, platform_ids):
             info.compress_type = zipfile.ZIP_DEFLATED
             data = manifest_for(platform_ids).encode() if rel.as_posix() == "blender_manifest.toml" else f.read_bytes()
             z.writestr(info, data)
+        # the Rust engine's source travels with the add-on (GPL): sources only, no build output
+        rs = ROOT / "engine-rs"
+        for f in sorted(rs.rglob("*")):
+            rel = f.relative_to(rs)
+            if not f.is_file() or rel.parts[0] in ("target", "bin") or "__pycache__" in f.parts:
+                continue
+            info = zipfile.ZipInfo.from_file(f, ("engine_src_rs/" + rel.as_posix()))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(info, f.read_bytes())
     print(f"{out.name:55s} {out.stat().st_size // 1024:6d} KB")
 
 

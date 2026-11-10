@@ -1,4 +1,4 @@
-"""FORGE: QuadForge's own remeshing engine (C++, no dependencies, outputs quads or triangles).
+"""FORGE: QuadForge's own remeshing engine (Rust, no dependencies, outputs quads or triangles).
 
 The engine is a small command line program that runs as a separate process. Blender
 never loads its code, so a bug in the engine cannot crash Blender, and a run can be
