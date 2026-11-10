@@ -89,7 +89,7 @@ fn long_feature_chains(soup: &TriSoup, requested: i32) -> (Vec<[i32; 2]>, Vec<[V
     // lattice: they land on neighbouring rows a fraction of a cell apart and make zero-width quads. Find marked
     // edges that sit near another marked edge which is far away along the chain (or in another chain), group them
     // into runs, and keep only the longer run of each close pair; the lattice then runs through the narrow band.
-    let ratio = env_f64("FORGE_THINFEAT").unwrap_or(1.0);
+    let ratio = env_f64("FORGE_THINFEAT").unwrap_or(0.75);
     if ratio > 0.0 {
         let n = soup.features.len();
         let thr = ratio * rho0;

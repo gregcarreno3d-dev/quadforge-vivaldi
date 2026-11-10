@@ -38,7 +38,7 @@ default in C++.
 
 | Variable | Effect |
 |---|---|
-| `FORGE_THINFEAT=<cells>` | Marked lines closer than this (default 1.0 cell) to another run of marked edges: the shorter run is left unmarked (`pipeline.rs`, `long_feature_chains`). `0` disables. |
+| `FORGE_THINFEAT=<cells>` | Marked lines closer than this (default 0.75 cell) to another run of marked edges: the shorter run is left unmarked (`pipeline.rs`, `long_feature_chains`). `0` disables. |
 | `FORGE_NOLADDER=1` | Subdivide 6+ sided hole polygons as a centroid star again instead of a quad ladder (`stages/extract/finish.rs`, `subdivide_polygons`). |
 | `FORGE_NOSTRIP`, `FORGE_STRIPPCT` | Closed thin-strip collapse off / threshold (percent of a cell). |
 | `FORGE_NOSTAR`, `FORGE_STARMIN` | Star replacement off / minimum valence. |
