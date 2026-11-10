@@ -542,13 +542,8 @@ impl<'a> Param<'a> {
         }
         let threads = 1;
         let (k, fixed, diag, b) = (&self.k, &self.fixed, &self.diag, &self.rhs);
-        let matvec = |v: &[f64], out: &mut Vec<f64>| {
-            par_fill(out, threads, |i| {
-                let mut s = 0.0;
-                for kk in k.start[i] as usize..k.start[i + 1] as usize { s += k.val[kk] * v[k.col[kk] as usize]; }
-                s
-            });
-        };
+        let _ = threads;
+        let matvec = |v: &[f64], out: &mut Vec<f64>| { out.resize(n, 0.0); k.mul(v, out); };
         let x = &mut self.x;
         let mut r = vec![0.0; n];
         let mut p = vec![0.0; n];
@@ -582,23 +577,28 @@ impl<'a> Param<'a> {
         while it < max_iter {
             matvec(&p, &mut ap);
             let mut pap = 0.0;
-            for i in 0..n { if fixed[i] { ap[i] = 0.0; } pap += p[i] * ap[i]; }
+            for ((a, &pp), &fx) in ap.iter_mut().zip(p.iter()).zip(fixed.iter()) { if fx { *a = 0.0; } pap += pp * *a; }
             if pap.abs() < 1e-300 { break; }
             let alpha = rz / pap;
             let mut rn = 0.0;
-            for i in 0..n {
-                if fixed[i] { continue; }
-                x[i] += alpha * p[i];
-                r[i] -= alpha * ap[i];
-                rn += r[i] * r[i];
+            for ((((xx, rr), &pp), &aa), &fx) in x.iter_mut().zip(r.iter_mut()).zip(p.iter()).zip(ap.iter()).zip(fixed.iter()) {
+                if fx { continue; }
+                *xx += alpha * pp;
+                *rr -= alpha * aa;
+                rn += *rr * *rr;
             }
             if rn <= tol * tol * bnorm.max(1.0) { it += 1; break; }
-            precond(&r, &mut zv, &mut rm);
             let mut rz_new = 0.0;
-            for i in 0..n { rz_new += r[i] * zv[i]; }
+            if !use_amg {
+                // Jacobi: preconditioner, dot product and direction update in one sweep needs rz_new first, so two sweeps
+                for (((zz, &rr), &dd), &fx) in zv.iter_mut().zip(r.iter()).zip(diag.iter()).zip(fixed.iter()) { let z = if fx { 0.0 } else { rr / dd }; *zz = z; rz_new += rr * z; }
+            } else {
+                precond(&r, &mut zv, &mut rm);
+                for i in 0..n { rz_new += r[i] * zv[i]; }
+            }
             let beta = rz_new / rz;
             rz = rz_new;
-            for i in 0..n { p[i] = if fixed[i] { 0.0 } else { zv[i] + beta * p[i] }; }
+            for ((pp, &z), &fx) in p.iter_mut().zip(zv.iter()).zip(fixed.iter()) { *pp = if fx { 0.0 } else { z + beta * *pp }; }
             it += 1;
         }
         it

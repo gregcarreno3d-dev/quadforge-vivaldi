@@ -40,9 +40,15 @@ impl Csr {
     }
 
     pub fn mul(&self, x: &[f64], y: &mut [f64]) {
+        assert!(x.len() >= self.n && y.len() >= self.n);
+        let (start, col, val) = (&self.start[..], &self.col[..], &self.val[..]);
+        debug_assert!(col.iter().all(|&c| (c as usize) < x.len()));
         for r in 0..self.n {
+            let (a, b) = (start[r] as usize, start[r + 1] as usize);
+            let (cs, vs) = (&col[a..b], &val[a..b]);
             let mut s = 0.0;
-            for k in self.start[r] as usize..self.start[r + 1] as usize { s += self.val[k] * x[self.col[k] as usize]; }
+            // SAFETY: every column index of a built matrix is below the vector length (asserted in debug builds)
+            for (c, v) in cs.iter().zip(vs) { s += v * unsafe { *x.get_unchecked(*c as usize) }; }
             y[r] = s;
         }
     }
