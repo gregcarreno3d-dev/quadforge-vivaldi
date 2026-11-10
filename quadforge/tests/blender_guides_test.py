@@ -33,13 +33,23 @@ for use in (False, True):
             a = np.array(me.vertices[e.vertices[0]].co); b = np.array(me.vertices[e.vertices[1]].co)
             vals.append(bool(near_arc(a) < 0.03 and near_arc(b) < 0.03))
         at.data.foreach_set('value', vals)
-        s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = 3000
-        s.hide_original = False; s.use_flow_guides = use; s.sym_x = sym
-        r = M.pipeline.run(M.bpy.context, obj, s)
-        f, n = aligned(r.object.data, arc)
-        stats = r.levels[0].stats
+        # Without guides the rows follow the field's own choice, which is luck on a sphere (it can happen to run along the
+        # arc). The baseline is therefore the mean over three sizes; the run with guides is judged at the main size.
+        fs = []
+        for target in ((2400, 3000, 3600) if not use else (3000,)):
+            s = M.pipeline.RemeshSettings(); s.output = "QUADS"; s.target_quads = target
+            s.hide_original = False; s.use_flow_guides = use; s.sym_x = sym
+            if target != 3000:
+                M.reset(); obj = M.make('sph', co, tris)
+                me = obj.data; at = me.attributes.new('quadforge_guide', 'BOOLEAN', 'EDGE')
+                at.data.foreach_set('value', vals)
+            r = M.pipeline.run(M.bpy.context, obj, s)
+            f, n = aligned(r.object.data, arc)
+            stats = r.levels[0].stats
+            fs.append(f)
+            print(f"  guides {'on ' if use else 'off'} symmetry {'X' if sym else '-'}: target {target}, faces {stats['faces']}, rows along the guide {100*f:.0f}% ({n} edges)")
+        f = sum(fs) / len(fs)
         results[(use, sym)] = (f, stats)
-        print(f"  guides {'on ' if use else 'off'} symmetry {'X' if sym else '-'}: faces {stats['faces']}, rows along the guide {100*f:.0f}% ({n} edges)")
 ok = True
 for sym in (False, True):
     gain = results[(True, sym)][0] - results[(False, sym)][0]
