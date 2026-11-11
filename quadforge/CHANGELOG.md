@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2 - Chamfer and bevel detector, second preview
+
+- The detector now also finds small rounded bevels (fillets of ~0.3 mm on rims) and measures each band on its own, so one model can have several chamfers and bevels of different angle and size; every band is reported with its own width, turn angle and radius.
+- Width and turn are measured across the band with a distance map from its two edges, so long thin CAD triangles no longer confuse it.
+- Still preview only: remeshing does not use the detector yet.
+
 ## 0.15.1 - Chamfer and bevel detector (preview)
 
 - New engine command `forge bands`: finds chamfers (flat strips) and bevels / fillets (curved strips) on a triangulated CAD mesh, with width, length, turn angle, radius and convex/concave side. No feature marks needed.
