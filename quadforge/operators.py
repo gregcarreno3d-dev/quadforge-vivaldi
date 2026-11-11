@@ -4,10 +4,12 @@ import time
 
 import bmesh
 import bpy
+import numpy as np
 from bpy.props import BoolProperty, StringProperty
 
 from . import guidance, texts
 from . import properties as properties_module
+from .core import mesh_io as mio
 from .core import pipeline
 from .presets import PRESETS
 
@@ -294,6 +296,69 @@ class QUADFORGE_OT_refresh_zones(bpy.types.Operator):
             item.name = names[label]
             item.factor = kept.get(item.name, 1.0)
         self.report({"INFO"}, f"{len(names)} zones listed.")
+        return {"FINISHED"}
+
+
+class QUADFORGE_OT_detect_bands(bpy.types.Operator):
+    """Find the chamfers and bevels of the active mesh (CAD-style) and colour them: orange = chamfer, blue = bevel"""
+    bl_idname = "quadforge.detect_bands"
+    bl_label = "Detect Chamfers and Bevels"
+    bl_options = {"REGISTER", "UNDO"}
+
+    max_width_mm: bpy.props.FloatProperty(
+        name="Widest Band (mm)", default=0.0, min=0.0, soft_max=50.0,
+        description="Widest chamfer or bevel to look for, in millimetres. 0 = automatic (4% of the part size)")
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH"
+
+    def execute(self, context):
+        from .core import bands as bands_core
+        obj = context.active_object
+        mesh = obj.data
+        if obj.mode == "EDIT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        dims = obj.dimensions
+        size_max = max(dims.x, dims.y, dims.z)
+        mm_per_unit, how = bands_core.guess_mm_per_unit(context.scene, size_max)
+        width_units = self.max_width_mm / mm_per_unit if self.max_width_mm > 0 else 0.0
+        try:
+            face_band, bands, report = bands_core.detect(obj, width_units)
+        except Exception as error:   # noqa: BLE001 - shown to the person
+            self.report({"ERROR"}, f"Detection failed: {error}")
+            return {"CANCELLED"}
+        # colours
+        mio.write_int_face_attribute(mesh, "qf_band", face_band + 1)
+        kinds = np.array([0] + [1 if b["kind"] == "chamfer" else 2 for b in bands])
+        face_kind = kinds[face_band + 1]
+        palette = np.array([[0.62, 0.62, 0.64, 1], [1.0, 0.42, 0.05, 1], [0.1, 0.45, 1.0, 1]], dtype=np.float32)
+        totals = np.empty(len(mesh.polygons), dtype=np.int32)
+        mesh.polygons.foreach_get("loop_total", totals)
+        loop_face = np.repeat(np.arange(len(mesh.polygons)), totals)
+        colors = palette[face_kind[loop_face]]
+        name = "QuadForge Bands"
+        attribute = mesh.color_attributes.get(name) or mesh.color_attributes.new(name, "FLOAT_COLOR", "CORNER")
+        attribute.data.foreach_set("color", colors.reshape(-1))
+        mesh.color_attributes.active_color = attribute
+        mesh.color_attributes.render_color_index = list(mesh.color_attributes).index(attribute)
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D":
+                area.spaces[0].shading.type = "SOLID"
+                area.spaces[0].shading.color_type = "VERTEX"
+        # text report
+        text = bpy.data.texts.get("QuadForge Bands") or bpy.data.texts.new("QuadForge Bands")
+        text.clear()
+        lines = [f"Part size: {dims.x * mm_per_unit:.2f} x {dims.y * mm_per_unit:.2f} x {dims.z * mm_per_unit:.2f} mm  ({how})",
+                 f"Bands found: {len(bands)}   (widest searched: {(width_units or 0.04 * float(np.linalg.norm(np.array(dims)))) * mm_per_unit:.2f} mm)", "",
+                 "  #  kind     side     width_mm  length_mm  turn   radius_mm  faces"]
+        for i, b in enumerate(bands[:200]):
+            lines.append(f"{i:3d}  {b['kind']:<8} {'convex' if b['convex'] else 'concave':<8} {b['width'] * mm_per_unit:8.2f} {b['length'] * mm_per_unit:10.2f} "
+                         f"{b['turn']:5.0f}  {b['radius'] * mm_per_unit:9.2f}  {b['faces']}")
+        text.write("\n".join(lines))
+        ch = sum(1 for b in bands if b["kind"] == "chamfer")
+        self.report({"INFO"}, f"{ch} chamfers, {len(bands) - ch} bevels found (orange / blue). Details in the text 'QuadForge Bands'.")
         return {"FINISHED"}
 
 

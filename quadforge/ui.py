@@ -195,6 +195,19 @@ class QUADFORGE_PT_main(_QuadForgePanel, bpy.types.Panel):
 
 # --------------------------------------------------------------------------- optional sections
 
+class QUADFORGE_PT_bands(_QuadForgePanel, bpy.types.Panel):
+    bl_label = "Chamfers and Bevels (preview)"
+    bl_parent_id = "QUADFORGE_PT_main"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        _prepare_layout(layout)
+        draw_wrapped_text(layout, context, "Finds the chamfers and bevels of a CAD-style mesh (STL) and paints them: orange = chamfer, blue = bevel. "
+                                           "Sizes are read in millimetres. Preview of the detector; remeshing does not use it yet.")
+        layout.operator("quadforge.detect_bands", icon="MOD_BEVEL")
+
+
 class QUADFORGE_PT_hard_edges(_QuadForgePanel, bpy.types.Panel):
     bl_label = "Hard Edges"
     bl_parent_id = "QUADFORGE_PT_main"

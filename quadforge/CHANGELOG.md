@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.1 - Chamfer and bevel detector (preview)
+
+- New engine command `forge bands`: finds chamfers (flat strips) and bevels / fillets (curved strips) on a triangulated CAD mesh, with width, length, turn angle, radius and convex/concave side. No feature marks needed.
+- New panel "Chamfers and Bevels (preview)" with the operator *Detect Chamfers and Bevels*: paints chamfers orange and bevels blue and writes a table (in millimetres, unit guessed from the scene or CAD-sized parts) into a text called "QuadForge Bands".
+- Remeshing does not use the detector yet; this version is for checking what it finds.
+
 ## 0.15.0 - 2026-11-10
 
 New

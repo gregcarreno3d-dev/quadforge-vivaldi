@@ -1,4 +1,5 @@
 pub mod amg;
+pub mod bands;
 pub mod borderweld;
 pub mod capping;
 pub mod extract;

@@ -27,6 +27,7 @@ from . import translations
 from .operators import (
     QUADFORGE_OT_apply_preset,
     QUADFORGE_OT_clear_guides,
+    QUADFORGE_OT_detect_bands,
     QUADFORGE_OT_mark_guides,
     QUADFORGE_OT_preview,
     QUADFORGE_OT_refresh_zones,
@@ -40,6 +41,7 @@ from .properties import QuadForgeProperties, QuadForgeZoneFactor
 from .ui import (
     QUADFORGE_MT_target,
     QUADFORGE_PT_advanced,
+    QUADFORGE_PT_bands,
     QUADFORGE_PT_density,
     QUADFORGE_PT_guides,
     QUADFORGE_PT_hard_edges,
@@ -59,6 +61,7 @@ _CLASSES = (
     QUADFORGE_OT_remesh_modal,
     QUADFORGE_OT_preview,
     QUADFORGE_OT_refresh_zones,
+    QUADFORGE_OT_detect_bands,
     QUADFORGE_OT_apply_preset,
     QUADFORGE_OT_reset_settings,
     QUADFORGE_OT_set_surface,
@@ -67,6 +70,7 @@ _CLASSES = (
     QUADFORGE_OT_clear_guides,
     QUADFORGE_MT_target,
     QUADFORGE_PT_main,
+    QUADFORGE_PT_bands,
     QUADFORGE_PT_hard_edges,
     QUADFORGE_PT_guides,
     QUADFORGE_PT_zones,
