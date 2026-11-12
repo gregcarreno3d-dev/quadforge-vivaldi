@@ -13,6 +13,7 @@ Figures in the image come from runs in Blender 5.2.3 on the author's machine; ti
 - Isolate zones by material, Face Set, mask or vertex group
 - Paintable density through a vertex group; smaller faces on thin parts and, optionally, on strongly curved details
 - Quick Preview before the full run, detail per zone, and an option that makes the result match your sculpt after Subdivision Surface
+- **Chamfer and bevel detector (preview, 0.15):** finds and paints the chamfers and bevels of CAD / STL parts; see [below](#chamfer-and-bevel-detector-preview)
 - Exact symmetry (no open seam), several levels of detail in one run, cancel with Esc
 - English and Spanish interface
 - Blender 4.2 or newer (developed and tested on Blender 5.2). GPL-3.0-or-later.
@@ -27,8 +28,8 @@ The panel appears in the 3D Viewport sidebar (**N**), **QuadForge** tab.
 ## How it works
 
 Many people ask how a quad remesher actually works, because the tools rarely explain themselves. FORGE follows the
-standard modern recipe for field-aligned quad meshing, written from scratch in about 5,500 lines of dependency-free
-C++17. In short:
+standard modern recipe for field-aligned quad meshing, written from scratch as a dependency-free
+Rust program (`engine-rs/`; it was C++17 until 0.14, see the changelog). In short:
 
 ![FORGE pipeline](docs/images/pipeline.svg)
 
@@ -65,6 +66,7 @@ problem or fall back rather than return an invalid mesh.
 | [**Technical report**](docs/TECHNICAL_REPORT.md) | The method in depth: equations, algorithms, evaluation against Blender's QuadriFlow and Decimate, limitations, how FORGE differs from the published methods, and references |
 | [**Architecture for AI assistants**](docs/ARCHITECTURE_FOR_AI.md) | A dense, exact map of the code for any AI (or contributor) that needs to understand or change it: file map, data flow, formats, decision flow, invariants, tests |
 | [User guide](quadforge/docs/USER_GUIDE.md) | Using the add-on |
+| [Chamfer and bevel detector](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md) | What the 0.15 detector does, how it works, its command line and limits |
 | [Testing guide](docs/TESTING_GUIDE.md) | A 30-minute checklist for people trying the add-on on their own machine and models |
 | [Status and limits](quadforge/docs/STATUS_AND_LIMITS.md) | What is tested, measured and not done yet |
 | [Changelog](quadforge/CHANGELOG.md) | Version history |
@@ -72,6 +74,17 @@ problem or fall back rather than return an invalid mesh.
 This is not a peer-reviewed paper and makes no claim of a new algorithm: it is an engineering implementation of
 published ideas ([references in the report](docs/TECHNICAL_REPORT.md#11-references)). If you use it in research,
 GitHub's **Cite this repository** button uses [`CITATION.cff`](CITATION.cff).
+
+## Chamfer and bevel detector (preview)
+
+For CAD-style meshes (triangulated STL, mostly 3D printing, millimetres) the add-on can find the small transition
+faces between big surfaces and tell them apart: **orange = chamfer** (flat), **blue = bevel / fillet** (curved). The
+table of widths, lengths, turn angles and radii is written to a text datablock, and every face gets a `qf_band`
+attribute. Today it is a preview: the remesher does not use it yet; that is the next development step.
+
+![Chamfers (orange) and bevels (blue) detected on four test parts with version 0.15.3](docs/images/bands_0.15.jpg)
+
+Details, parameters, JSON format and known limits: [`CHAMFER_BEVEL_DETECTOR.md`](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md).
 
 ## Measured quality
 
@@ -85,13 +98,13 @@ on meshes you can regenerate are in the [technical report](docs/TECHNICAL_REPORT
 
 The FORGE engine is validated most on Linux with Blender 5.2. Engines for Windows and macOS (Intel and Apple Silicon)
 are built by the CI workflow and pass the engine tests there, but have had little real-world use: please open an issue
-if something fails.
+if something fails. The chamfer/bevel detector (0.15.x) is currently only in the Linux engine; the other platforms get it with the next CI build.
 
 ## Folders
 
 - `quadforge/` the add-on (Python) and its documentation
 - `engine-rs/` the FORGE engine source (Rust, no dependencies; `engine-rs/README.md` maps every work area to its file)
-- `engine/` the original C++17 engine, kept as a reference and reserve (not shipped)
+- `engine/` the original C++17 engine (used until 0.14), kept as a reference only (not shipped, no chamfer detector)
 - `docs/` technical report, architecture for AI assistants, figures
 - `tests/`, `tools/` tests, build scripts and quality metrics
 

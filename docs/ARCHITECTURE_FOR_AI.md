@@ -1,6 +1,6 @@
 # QuadForge Vivaldi: architecture and behaviour, written for AI assistants
 
-Version described: **0.14.0**. Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.15.4** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -42,6 +42,7 @@ quadforge/                    the add-on (this folder is what Blender installs)
     geometry.py               MeshArrays, normals/areas, edge angles, zone labels from vertex groups, stats
     mesh_io.py                bulk read/write of Blender mesh data with foreach_get/foreach_set
     forge_io.py               .fmesh read/write
+    bands.py                  chamfer/bevel detector client: runs `forge bands`, guesses mm per unit (see docs/CHAMFER_BEVEL_DETECTOR)
     detail.py                 relax badly shaped quads and project them back on the source
     uvtransfer.py             UV transfer by projection onto the original surface
     zonedata.py               Face Sets and sculpt-mask transfer
@@ -50,12 +51,12 @@ quadforge/                    the add-on (this folder is what Blender installs)
       base.py                 Backend, RemeshRequest, BackendError
       forge.py                runs the engine process, parses its output, writes the result into the mesh
   bin/<platform>/forge[.exe]  prebuilt engines: windows, linux, macos-arm64, macos-x64
-  engine_src/                 copy of engine/src shipped inside the add-on
+  engine_src/                 C++ reference source copy (the shipped Rust source is engine_src_rs/ inside the zip)
   tests/                      Blender integration tests (run with the bpy module) and pure-Python tests
   devtools/                   engine test suites (engine_tests/), helpers
   docs/                       user guide, decisions, status and limits, benchmark protocol
 engine-rs/src/                FORGE engine source (Rust; see engine-rs/README.md for the work-area map)
-engine/src/                   original C++17 engine (reference, not shipped)
+engine/src/                   original C++17 engine (used until 0.14; reference, not shipped)
 tools/                        build.py (Zig cross-compiler), package.py, make_delivery.py, quality_metrics.py,
                               meshgen.py (synthetic meshes), fmesh.py, stlio.py, harness.py
 tests/                        early engine tests t01..t05
@@ -63,7 +64,7 @@ docs/                         this documentation (technical report, this file, i
 .github/workflows/ci.yml      builds the engine on 4 platforms and runs the tests
 ```
 
-`engine/src` and `quadforge/engine_src` must stay identical (the second is the copy that ships in the add-on).
+`engine/src` and `quadforge/engine_src` (C++ reference copies) stay identical; the shipped engine is built from `engine-rs/`.
 
 ## 2. Runtime data flow
 
@@ -142,7 +143,7 @@ forge remesh --in A.fmesh --out B.fmesh --faces N [--mode tri|quad] [--threads N
 symmetry guide lines are marked (`fast_seams`), `--curv-adapt` for Detail on Curves (quads only), `--threads`.
 In quad mode `--faces` is the **final quad count**.
 
-### 3.2 `.fmesh` binary format (little endian; `core/forge_io.py`, `engine/src/meshio.hpp`)
+### 3.2 `.fmesh` binary format (little endian; `core/forge_io.py`, `engine-rs/src/io/fmesh.rs`)
 
 ```
 char[4]  "FMSH"
@@ -181,30 +182,30 @@ Temporary objects: `QuadForge_work`, `QuadForge_proxy`; modifier `QuadForge_Deci
 
 ## 4. Engine internals
 
-All engine code is in namespace `forge`, header-only modules included by `main.cpp`.
+The engine is a Rust crate in `engine-rs/` (standard library only; no namespace, one module per stage). It was C++17 until 0.14; the C++ source in `engine/src/` is a frozen reference and has no `bands` command. Work-area map with more detail: `engine-rs/README.md`.
 
-| File | Role |
+| File (under `engine-rs/src/`) | Role |
 |---|---|
-| `vec.hpp` | 3D vector math |
-| `bvh.hpp` | BVH: closest point on a triangle surface (`SurfaceIndex`) and on line segments (`SegmentIndex`) |
-| `meshio.hpp` | `.fmesh` I/O, `PolyMesh` |
-| `repair.hpp` | polygon soup → manifold triangle mesh (`TriSoup`), `RepairReport` |
-| `cmesh.hpp` | corner-table triangle mesh with safe flip/split/collapse |
-| `remesh.hpp` | `Remesher`: isotropic remeshing, face-count steering, projection |
-| `sizefield.hpp` | `thicknessSizeField` (shrinking ball), `curvatureSizeField`, `gapSizeField`, grading |
-| `capping.hpp` | `capBorders`: close open boundary loops with centroid fans; `stitchSlits` |
-| `field.hpp` | `buildFrames`, `solveCrossField` (complex z = exp(4iθ)) |
-| `param.hpp` | `IntegerParam`: seamless integer-grid parametrization (+ parallel CG) |
-| `amg.hpp` | smoothed-aggregation AMG preconditioner (experimental, off; `FORGE_AMG=1`) |
-| `extract.hpp` | `Extractor`: field transfer, parametrization call, snapping, face tracing, 1→4 subdivision, relaxation |
-| `quadquality.hpp` | `improveQuads`: raise the worst scaled Jacobian by local vertex moves |
-| `quadopt.hpp` | chord-rotation pole optimiser (off by default) |
-| `quad.hpp` | `Quadifier`: pairing fallback |
-| `metrics.hpp` | statistics JSON |
-| `parallel.hpp` | `parallelFor`, `defaultThreads()` = min(cores, 16) |
-| `main.cpp` | command line and the decision flow below |
+| `main.rs` | entry: subcommands `remesh`, `repair`, `bands`; `forge bands` runs the detector (section 4.2) |
+| `cli.rs` | `remesh` flags and `USAGE` |
+| `pipeline.rs` | the decision flow below (route choice, retries, fallbacks) |
+| `io/fmesh.rs`, `util/protocol.rs` | `.fmesh` I/O, stdout protocol (`P`, `R`, `S`, `B`, `OK`, `ERR`) |
+| `util/parallel.rs`, `util/rng.rs` | `parallel_for`, threads = min(cores, 16); deterministic RNG |
+| `math/` (`vec3`, `aabb`, `complex`, `geom`) | vector math, boxes, complex numbers, triangle geometry |
+| `mesh/bvh.rs`, `mesh/cmesh.rs` | BVH (closest point on surface / segments); corner-table triangle mesh with safe flip/split/collapse |
+| `stages/repair.rs` | polygon soup → manifold triangle mesh, repair report |
+| `stages/borderweld.rs`, `stages/capping.rs` | weld short borders; close open boundary loops with centroid fans, `stitch_slits` |
+| `stages/remesh.rs` | isotropic remeshing, face-count steering, projection |
+| `stages/sizefield.rs` | thickness (shrinking ball), curvature and gap size fields, grading |
+| `stages/field.rs` | frames, cross field (complex z = exp(4iθ)) |
+| `stages/param.rs`, `stages/amg.rs` | seamless integer-grid parametrization (+ parallel CG); AMG preconditioner (experimental, off; `FORGE_AMG=1`) |
+| `stages/extract/` (`lattice.rs`, `finish.rs`, `mod.rs`) | field transfer, parametrization call, snapping, face tracing, 1→4 subdivision, relaxation, all-quad cleanup |
+| `stages/quadquality.rs` | raise the worst scaled Jacobian by local vertex moves |
+| `stages/quad.rs`, `stages/quadopt.rs` | pairing fallback; chord-rotation pole optimiser (off by default) |
+| `stages/metrics.rs` | statistics JSON |
+| `stages/bands.rs` | **chamfer and bevel detector** (preview, not used by the remesher yet) |
 
-### 4.1 Decision flow in `main.cpp` (`runMain`)
+### 4.1 Decision flow in `pipeline.rs`
 
 ```
 read .fmesh → repairMesh → stitchSlits
@@ -246,6 +247,18 @@ into cells; neighbouring nodes create edges; dangling cells are pruned; (4) face
 (a quad → 4), relax 15 sweeps (factor 0.6, reproject onto the surface), snap to marked lines within 0.3·rho,
 merge valence-2 dead ends (≤ 6 rounds), `improveQuads(..., 40 sweeps, threshold 0.6)`.
 
+### 4.2 Chamfer and bevel detector (`forge bands`, `stages/bands.rs`)
+
+Full description: `quadforge/docs/CHAMFER_BEVEL_DETECTOR.md`. Summary for code readers:
+
+- **Command:** `forge bands --in X.fmesh [--json OUT] [--sharp 25] [--curved F] [--narrow 0.35] [--max-width W] [--min-width W] [--link 35] [--elong 2]`. Prints `B <json>` (no per-face data) and `OK`; `--json` file also has `face_band` (band id per input polygon, -1 = none).
+- **Definitions:** band = narrow elongated strip joining two larger surfaces and turning the surface; *chamfer* = flat, *bevel* = curved; fields per band: `kind, convex, faces, facets, area, width, length, turn, curvature, radius`.
+- **Pipeline:** weld → triangles with owner polygon → dihedral angles (sharp edges ≥ 25° separate regions) → per-face curvature kappa and turning axis → curved class with hysteresis → regions (same class, compatible axis, corner patches apart) → candidates (elongation ≥ 2, width in [min, max]) → clusters of side-by-side strips → measurement → rejection (too short, wider than neighbours, turn outside [8°, 135°]) → leftover propagation and merge of touching similar bands.
+- **Multi-scale:** widest band = 4 % of bbox diagonal × [1, 1.4, 2, 2.8]; finer scale wins; coarser scales need turn ≥ 20°. `--max-width` forces one scale. `min_width` default 0.3 % of the diagonal.
+- **Add-on side:** `core/bands.py::detect(obj)` → `operators.QUADFORGE_OT_detect_bands` (`quadforge.detect_bands`) writes face attribute `qf_band` (band number from 1, 0 = none), a vertex colour layer (orange chamfer, blue bevel) and the text datablock `QuadForge Bands`; panel `QUADFORGE_PT_bands` in `ui.py`. mm per unit is guessed in `core/bands.py::guess_mm_per_unit`.
+- **Debug:** `FORGE_BANDS_DEBUG=1` (rejection reasons, per-face region/kappa in JSON), `FORGE_DBG=1` (one line per region).
+- **Not done:** the remesher ignores bands; Windows/macOS binaries in the repo predate the command.
+
 ## 5. Settings → behaviour (Python `RemeshSettings`)
 
 | Setting | Effect |
@@ -282,7 +295,8 @@ on, Detail on Curves off) and **Organic**. Presets set target and angle and neve
 5. **UI text is English** in `texts.py`; Spanish lives only in `translations.py`. No hard-coded user strings elsewhere.
 6. **Clean-room policy:** code was written from observable behaviour and published papers; do not copy code from
    proprietary tools. GPL code reused from another project must keep its notice in the file header.
-7. **`engine/src` and `quadforge/engine_src` stay identical.**
+7. **`engine/src` and `quadforge/engine_src` (C++ reference) stay identical; the shipped engine is `engine-rs/`.**
+7b. **The detector never changes the mesh**: it only adds the `qf_band` face attribute, a colour attribute and a text datablock.
 8. Prefer a clear warning to a silent change of behaviour. Fallbacks always report their reason.
 
 ## 7. Lessons already paid for (do not repeat)
@@ -305,6 +319,8 @@ on, Detail on Curves off) and **Organic**. Presets set target and angle and neve
 | Add-on in Blender | `quadforge/tests/blender_integration_test.py` (29), `blender_matrix_test.py` (67), `blender_forge_test.py`, `blender_guides_test.py`, `blender_uv_test.py`, `blender_zones_test.py`, `blender_vgzones_test.py`, `blender_surface_test.py`, `blender_hard_test.py`, `blender_preview_test.py`, `blender_zone_detail_test.py`, `blender_subdiv_test.py`, `blender_head_test.py` (synthetic head) | run with the `bpy` module (`pip install bpy numpy scikit-image`); the Linux engine must be in `quadforge/bin/linux/` |
 | Pure Python | `test_features.py`, `test_geometry.py`, `test_planning.py`, `test_guidance.py`, `test_forge_backend.py` | no Blender needed (the last one runs the real engine) |
 | Metrics | `tools/quality_metrics.py` | scaled Jacobian, irregular share, distance to source |
+
+Detector regression: build with `cargo build --release`, run `forge bands --in part.fmesh` on the reference parts and compare band counts; `cargo test --release` covers the unit tests.
 
 Run the engine tests like this (from the repository root, after `python3 tools/build_rust.py`):
 

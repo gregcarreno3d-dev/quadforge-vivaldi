@@ -1,11 +1,11 @@
 # FORGE: field-aligned integer-grid quad remeshing inside Blender
 
-**Technical report for QuadForge Vivaldi 0.14.0** · GPL-3.0-or-later · November 2026
+**Technical report for QuadForge Vivaldi 0.15** (engine rewritten in Rust in 0.15.0; the method is unchanged) · GPL-3.0-or-later · November 2026
 
 > **What this document is.** A description of how the QuadForge add-on and its FORGE engine turn an arbitrary triangle or
 > polygon mesh into a clean quad mesh. It is a **technical report, not a peer-reviewed paper**. FORGE does not claim a new
 > algorithm: it assembles well-known published techniques (isotropic remeshing, 4-direction cross fields, seamless
-> integer-grid parametrization) into a compact C++17 program and adds a layer of practical engineering around them.
+> integer-grid parametrization) into a compact Rust program and adds a layer of practical engineering around them.
 > Every statement below was checked against the source code in this repository. Where FORGE is simpler than the
 > published method it borrows from, that is said explicitly (see [section 9](#9-how-forge-differs-from-the-published-methods)).
 >
@@ -16,7 +16,7 @@
 1. [The problem](#1-the-problem)
 2. [Overview](#2-overview)
 3. [Stage A: preparation in Blender (Python)](#3-stage-a-preparation-in-blender-python)
-4. [Stage B: the FORGE engine (C++)](#4-stage-b-the-forge-engine-c)
+4. [Stage B: the FORGE engine (Rust)](#4-stage-b-the-forge-engine-rust)
 5. [Stage C: finishing in Blender (Python)](#5-stage-c-finishing-in-blender-python)
 6. [The fallback path: triangle pairing](#6-the-fallback-path-triangle-pairing)
 7. [Evaluation](#7-evaluation)
@@ -56,7 +56,7 @@ The add-on is split into two processes:
 | Part | Language | Runs in | Job |
 |---|---|---|---|
 | **QuadForge** (`quadforge/`) | Python (+ NumPy, `bmesh`) | Blender | Reads the mesh, decides constraints (hard edges, zones, symmetry, density), launches the engine, builds the result objects |
-| **FORGE** (`engine/src/`) | C++17, no dependencies | A separate process | Repairs the mesh, remeshes it isotropically, computes the field and the parametrization, extracts the quads |
+| **FORGE** (`engine-rs/src/`) | Rust, standard library only | A separate process | Repairs the mesh, remeshes it isotropically, computes the field and the parametrization, extracts the quads |
 
 The two talk through a small binary file format (`.fmesh`) and a line-based text protocol on the engine's
 standard output. Because the engine is a separate process, a crash in it cannot close Blender, and pressing Esc simply
@@ -136,13 +136,13 @@ Positions, polygons, hard-edge vertex pairs, the density multiplier and the guid
 file (little-endian: magic `FMSH`, version 1, counts, float32 positions, polygon sizes and indices, hard-edge pairs, and
 optional density and guide blocks selected by flags). The engine is launched with `--faces N --mode quad`.
 
-## 4. Stage B: the FORGE engine (C++)
+## 4. Stage B: the FORGE engine (Rust)
 
-Source: `engine/src/` (about 5,500 lines). The control flow is in `main.cpp`.
+Source: `engine-rs/src/` (one module per stage, mapped in `engine-rs/README.md`). The control flow is in `pipeline.rs`. The engine was written in C++17 until 0.14 (`engine/`, kept as a reference); the Rust port produces the same results on the engine test suites. Since 0.15 it also contains a chamfer and bevel detector (`stages/bands.rs`), described in [`CHAMFER_BEVEL_DETECTOR.md`](../quadforge/docs/CHAMFER_BEVEL_DETECTOR.md); the remesher does not use it yet.
 
 ### 4.1 Repair
 
-`repair.hpp` turns arbitrary polygon soup into a valid manifold triangle mesh: it triangulates (quads along the
+`repair.rs` turns arbitrary polygon soup into a valid manifold triangle mesh: it triangulates (quads along the
 shorter diagonal), drops faces that repeat a vertex and exact duplicates, orients every connected piece consistently,
 unlinks non-manifold edges (they become open borders, which are preserved), duplicates pinched vertices so each vertex
 has a single fan of faces, and removes unused vertices. A JSON report of what was found is sent back. Flat sliver
@@ -152,7 +152,7 @@ break the grid.
 ### 4.2 Open borders: capping
 
 The integer-grid machinery wants a closed surface (a closed loop of fixed length cannot hold a non-integer number of
-cells). `capping.hpp` closes every boundary loop with a fan of triangles around its centroid:
+cells). `capping.rs` closes every boundary loop with a fan of triangles around its centroid:
 
 * loops shorter than about 6 estimated quad edges are simply left closed (the hole disappears);
 * longer loops are marked *removable*: their border edges become feature lines the grid aligns to, and the cap triangles
@@ -164,7 +164,7 @@ path on the original open mesh.
 
 ### 4.3 Size field: thin parts and curved details
 
-Without help, a uniform grid under-resolves thin parts. `sizefield.hpp` computes a per-vertex edge-length multiplier
+Without help, a uniform grid under-resolves thin parts. `sizefield.rs` computes a per-vertex edge-length multiplier
 *s* ∈ [`minScale`, 1] from the geometry:
 
 * **Thickness** with the *shrinking-ball* method: at each vertex, the radius *r* of the largest ball that touches the
@@ -185,7 +185,7 @@ The multiplier is multiplied into any density the user painted.
 
 ### 4.4 Isotropic triangle remeshing
 
-`remesh.hpp` implements incremental isotropic remeshing in the style of Botsch and Kobbelt [1]. The initial target edge
+`remesh.rs` implements incremental isotropic remeshing in the style of Botsch and Kobbelt [1]. The initial target edge
 length follows from the (density-weighted) surface area and the target triangle count *T*, so that *T* equilateral
 triangles would cover the area:
 
@@ -204,7 +204,7 @@ grid is aligned to them in the parametrization instead.
 
 ### 4.5 The cross field
 
-`field.hpp` computes a smooth field of four orthogonal directions on every face. A face with local frame (e₁, e₂) is
+`field.rs` computes a smooth field of four orthogonal directions on every face. A face with local frame (e₁, e₂) is
 described by one complex number
 
 $$ z = e^{4i\theta} $$
@@ -232,7 +232,7 @@ et al. [5]).
 
 ### 4.6 Seamless integer-grid parametrization
 
-`param.hpp` is the core of the engine: a compact mixed-integer quadrangulation in the spirit of Bommes et al. [3, 12].
+`param.rs` is the core of the engine: a compact mixed-integer quadrangulation in the spirit of Bommes et al. [3, 12].
 The goal is a map (*u*, *v*) at every triangle corner such that the lines *u* = integer and *v* = integer are the
 edges of the quad mesh, one lattice cell per ρ × ρ patch of surface.
 
@@ -262,12 +262,12 @@ edges of the quad mesh, one lattice cell per ρ × ρ patch of surface.
 The linear systems are large, sparse and badly conditioned. They are solved with a Jacobi-preconditioned conjugate
 gradient that runs the *entire iteration* on a team of threads with a spinning barrier; rows are split in fixed chunks,
 so results are deterministic for a given thread count. A smoothed-aggregation algebraic multigrid preconditioner
-([10], `amg.hpp`) is implemented but **off by default**: on current meshes it was slower than Jacobi-CG.
+([10], `amg.rs`) is implemented but **off by default**: on current meshes it was slower than Jacobi-CG.
 Parametrization time dominates the run at high face counts (see section 8).
 
 ### 4.7 Quad extraction
 
-`extract.hpp` turns the (*u*, *v*) map into a polygon mesh. This is **simpler than the exact method of Ebke et al.
+`extract/` turns the (*u*, *v*) map into a polygon mesh. This is **simpler than the exact method of Ebke et al.
 [7]** (see section 9):
 
 1. Every mesh vertex is moved to the nearest lattice node of its own (*u*, *v*) (in surface units, using the face's
@@ -331,7 +331,7 @@ The method actually used is always reported (`"method"`: `extract` or `pair`).
 ## 6. The fallback path: triangle pairing
 
 Used when the grid method cannot run (open borders that could not be closed, the user forced it) or failed. Source:
-`quad.hpp`, `quadopt.hpp`.
+`quad.rs`, `quadopt.rs`.
 
 1. A smooth cross field is computed as in 4.5 on an isotropic triangle mesh of *N*/2 triangles.
 2. Triangles are **paired** into quads. Every candidate pair has a cost that prefers right angles, flat pairs, balanced
@@ -346,7 +346,7 @@ Used when the grid method cannot run (open borders that could not be closed, the
 4. Every polygon is subdivided (quad → 4 quads, leftover triangle → 3 quads) and relaxed toward the nearest square
    turned to the field, with reprojection onto the surface.
 
-An optional "chord rotation" optimiser (`quadopt.hpp`) moves poles by simulated annealing; it is off by default
+An optional "chord rotation" optimiser (`quadopt.rs`) moves poles by simulated annealing; it is off by default
 because it removed only about 3 % of the poles on the test model — the poles come from the field's singularities, not
 from local moves.
 
@@ -501,7 +501,7 @@ Quality metrics of any result: `python3 tools/quality_metrics.py result.fmesh --
 Each entry was checked against its publisher, DOI or the authors' page.
 
 1. Botsch, M. and Kobbelt, L. **A remeshing approach to multiresolution modeling.** *Symposium on Geometry Processing (SGP)*, 2004, pp. 189–196. DOI [10.2312/SGP/SGP04/189-196](https://doi.org/10.2312/SGP/SGP04/189-196).
-2. Jakob, W., Tarini, M., Panozzo, D. and Sorkine-Hornung, O. **Instant field-aligned meshes.** *ACM Transactions on Graphics (SIGGRAPH Asia)*, 2015. <https://rgl.epfl.ch/publications/Jakob2015Instant>. *(Cited as background for field-aligned remeshing; FORGE does not use its position-field optimiser by default, but an earlier Gauss–Seidel position field in the same spirit remains as a fallback inside `extract.hpp`.)*
+2. Jakob, W., Tarini, M., Panozzo, D. and Sorkine-Hornung, O. **Instant field-aligned meshes.** *ACM Transactions on Graphics (SIGGRAPH Asia)*, 2015. <https://rgl.epfl.ch/publications/Jakob2015Instant>. *(Cited as background for field-aligned remeshing; FORGE does not use its position-field optimiser by default, but an earlier Gauss–Seidel position field in the same spirit remains as a fallback inside `extract/`.)*
 3. Bommes, D., Zimmer, H. and Kobbelt, L. **Mixed-integer quadrangulation.** *ACM Transactions on Graphics (SIGGRAPH)*, 2009. <https://www.graphics.rwth-aachen.de/publication/0344/>.
 4. Bommes, D., Lévy, B., Pietroni, N., Puppo, E., Silva, C., Tarini, M. and Zorin, D. **Quad-mesh generation and processing: a survey.** *Computer Graphics Forum* 32(6), 2013, pp. 51–76. <https://diglib.eg.org/handle/10.1111/v32i6pp051-076>.
 5. Ray, N., Vallet, B., Li, W. C. and Lévy, B. **N-symmetry direction field design.** *ACM Transactions on Graphics* 27(2), 2008. <https://hal.archives-ouvertes.fr/inria-00331900>.

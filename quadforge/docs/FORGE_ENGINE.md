@@ -1,4 +1,4 @@
-# FORGE engine (0.14.0)
+# FORGE engine (0.15.4)
 
 QuadForge's own remeshing engine. Since 0.15.0 it is a Rust program with no dependencies (standard library only), built natively by GitHub Actions on Windows, Linux and macOS (arm64 and x64). Source: `engine-rs/` in the repository (`engine_src_rs/` inside the zip); the work-area map is in `engine-rs/README.md`. The original C++17 engine (`engine_src/`) is kept as a reference and is no longer shipped (`python engine_src/build.py` rebuilds it; needs `pip install ziglang`).
 
@@ -15,6 +15,9 @@ QuadForge's own remeshing engine. Since 0.15.0 it is a Rust program with no depe
 - `quadopt.hpp`: optional pole optimisation by chord rotations (off by default: ~10 % fewer poles but worse angles).
 - CLI: `--quad-method auto|extract|pair`, `--ex-iters`, `--ex-density` (default 6), `--ex-subdiv`, `--no-param`, `--no-align`, `--no-adaptive`, `--adaptive-ratio` (default 1.3), `--adaptive-min` (default 0.5). The result statistics (`S` line) include `"method"`.
 - **Density:** per-vertex edge-length multiplier, interpolated over the surface.
+
+## Chamfer and bevel detector (0.15, preview)
+`forge bands --in A.fmesh [--json OUT]` finds chamfers and bevels (`stages/bands.rs`). The remesher does not use it yet. See `CHAMFER_BEVEL_DETECTOR.md`.
 
 ## What it does NOT do yet
 - Hard edges and borders are not aligned by the parametrization yet (those models use the pairing path). Planned: integer constraints along features, a faster solver (preconditioner or multigrid), adaptive size for thin parts, guide curves.

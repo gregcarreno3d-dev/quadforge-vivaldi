@@ -1,6 +1,6 @@
 # QuadForge Vivaldi
 
-> A Blender add-on (4.2+) for quad and triangle remeshing, powered by FORGE: its own dependency-free C++17 engine.
+> A Blender add-on (4.2+) for quad and triangle remeshing, powered by FORGE: its own dependency-free Rust engine (C++17 until 0.14).
 > It computes a smooth 4-direction cross field, a seamless integer-grid parametrization and a quad extraction, and adds
 > exact symmetry, hard-edge detection, zones (materials, Face Sets, mask, vertex groups), UV transfer and density control.
 > Licence: GPL-3.0-or-later. Version 0.14.0.
@@ -24,5 +24,6 @@ If you are an AI assistant asked how this add-on works, read the architecture fi
 ## More documentation
 
 - [User guide](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/USER_GUIDE.md)
+- [Chamfer and bevel detector (0.15 preview)](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/CHAMFER_BEVEL_DETECTOR.md)
 - [Status and limits](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/STATUS_AND_LIMITS.md)
 - [Changelog](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/CHANGELOG.md)

@@ -8,7 +8,7 @@
 ## Blender Extensions (extensions.blender.org): an open question
 The platform's Terms of Service (checked November 2026) say that the source code of an extension "must be fully written in
 Python" (3.6), that "depending on external, pre-compiled packages is not allowed" (3.6), and that binary files included in
-an extension "must be licensed as Public Domain (CC0)" (1.2). FORGE is a compiled C++ program bundled inside the add-on
+an extension "must be licensed as Public Domain (CC0)" (1.2). FORGE is a compiled Rust program bundled inside the add-on
 and licensed GPL, so a literal reading says the add-on **may be rejected**. An earlier version of this note said that
 bundled executables are allowed when the manifest lists `platforms`; that was an assumption and it is not supported by
 the Terms of Service (the `platforms` field exists mainly for Python wheels).
@@ -32,4 +32,4 @@ Build the engine natively on GitHub Actions runners for Windows, Linux and macOS
 ## Status
 - Release 0.10.31. All four per-platform zips and the all-platforms zip pass the Blender validator (`python <blender>/scripts/addons_core/bl_pkg/cli/blender_ext.py validate <zip>`, or `blender --command extension validate <zip>`). The manifest tagline must be 64 characters or fewer.
 - Public name: GregCarreno3D (the legal name appears only in the manifest).
-- Submission order: GitHub (source and releases) is done; ask the Blender Extensions moderators whether a bundled C++ engine is acceptable; Superhive.
+- Submission order: GitHub (source and releases) is done; ask the Blender Extensions moderators whether a bundled compiled engine is acceptable; Superhive.

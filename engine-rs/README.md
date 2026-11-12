@@ -1,8 +1,8 @@
 # FORGE engine (Rust)
 
 The Rust port of the FORGE engine of QuadForge Vivaldi. Same `.fmesh` files and same stdout protocol
-(`P` progress, `R` repair report, `S` stats JSON, `OK`/`ERR`) as the C++ engine in `../engine/`, so the add-on runs
-either one (`FORGE_ENGINE=/path/to/forge` selects a build for development). No dependencies: `cargo build --release`.
+(`P` progress, `R` repair report, `S` stats JSON, `OK`/`ERR`) as the former C++ engine in `../engine/` (reference only), so
+the add-on runs any build (`FORGE_ENGINE=/path/to/forge` selects one for development). No dependencies: `cargo build --release`.
 
 ## Where things are (one module per stage)
 
@@ -23,12 +23,13 @@ either one (`FORGE_ENGINE=/path/to/forge` selects a build for development). No d
 | all-quad cleanup (thin strips, dead ends, stars)       | `src/stages/extract/finish.rs`           |
 | quad quality polish                                    | `src/stages/quadquality.rs`              |
 | metrics JSON                                           | `src/stages/metrics.rs`                  |
+| chamfer / bevel detector (`forge bands`)               | `src/stages/bands.rs`, flags in `src/main.rs` |
 
 ## Status
 
 Parity with the C++ engine on the engine test suites (`t07_robustness --quick`, `t08_hard_cases`: 29/29) and on the
-Cylinder Ver-03 model at 120K (same quality, about 20% slower in the solver). The C++ engine remains the one the add-on
-ships until the Rust engine is better, not just equal. Known open problems (the reason for the port): chamfer strips
+Cylinder Ver-03 model at 120K (same quality, about 20% slower in the solver). Since 0.15.0 the Rust engine is the one the add-on ships
+(the C++ engine is a frozen reference). Known open problems (the reason for the port): chamfer strips
 thinner than one cell and the hole-filling stars, see `../quadforge/docs/`.
 
 Not ported on purpose: experimental seam repair (`FORGE_SEAMFIX`) and the cell-size retry (`FORGE_RETRY`), both off by
@@ -45,3 +46,9 @@ default in C++.
 
 Known limit: a few quads with coincident vertices remain on hard-surface plates (also present in the C++ engine).
 Welding them after extraction was tried and rejected: it breaks the closed-mesh check and triggers the fallback.
+
+## Chamfer and bevel detector
+
+`forge bands --in part.fmesh [--json out.json] [--sharp 25] [--curved F] [--narrow 0.35] [--max-width W] [--min-width W] [--link 35] [--elong 2]`
+finds chamfers and bevels (0.15.x preview; the remesher does not use it yet). Debug: `FORGE_BANDS_DEBUG=1`, `FORGE_DBG=1`.
+Full description: `../quadforge/docs/CHAMFER_BEVEL_DETECTOR.md`.
