@@ -29,6 +29,11 @@ pub struct BandParams {
     pub link_width_ratio: f64,
     /// Widest strip that still counts as a band (model units); 0 = 4 % of the bounding box diagonal.
     pub max_width: f64,
+    /// Narrowest strip that still counts as a band (model units); 0 = 0.3 % of the bounding box diagonal.
+    /// Slivers below it (a 0.05 mm land under a chamfer) are far smaller than any cell and stay plain sharp edges.
+    pub min_width: f64,
+    /// Multiplier on the automatic widest band (internal: the detector runs at several scales).
+    pub auto_scale: f64,
     /// Minimum length / width of a candidate.
     pub min_elong: f64,
     /// Accepted total turn between the two outer neighbours (degrees).
@@ -37,7 +42,7 @@ pub struct BandParams {
 }
 
 impl Default for BandParams {
-    fn default() -> Self { BandParams { sharp_deg: 25.0, curved_factor: 1.5, curved_low: 0.9, narrow_ratio: 0.35, link_deg: 35.0, link_width_ratio: 1e9, max_width: 0.0, min_elong: 2.0, min_turn_deg: 8.0, max_turn_deg: 135.0 } }
+    fn default() -> Self { BandParams { sharp_deg: 25.0, curved_factor: 1.5, curved_low: 0.9, narrow_ratio: 0.35, link_deg: 35.0, link_width_ratio: 1e9, max_width: 0.0, min_width: 0.0, auto_scale: 1.0, min_elong: 2.0, min_turn_deg: 8.0, max_turn_deg: 135.0 } }
 }
 
 #[derive(Clone, Debug)]
@@ -121,7 +126,7 @@ fn seg_seg(a: Vec3, b: Vec3, c: Vec3, d: Vec3) -> f64 {
 
 fn cls_area(cfaces: &[Vec<usize>], area: &[f64], c: usize) -> f64 { cfaces[c].iter().map(|&f| area[f]).sum() }
 
-pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
+fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
     let mut rep = BandReport { face_band: vec![-1; m.sizes.len()], ..Default::default() };
     if m.p.is_empty() { return rep; }
     // ---- weld vertices by position
@@ -179,7 +184,8 @@ pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
     drop(emap);
     // ---- regions: faces split by sharp edges and by "curved" (bevel-like) versus "flat" class
     let cen: Vec<Vec3> = tv.iter().map(|t| (wp[t[0] as usize] + wp[t[1] as usize] + wp[t[2] as usize]) * (1.0 / 3.0)).collect();
-    let max_w = if prm.max_width > 0.0 { prm.max_width } else { 0.04 * diag };
+    let max_w = if prm.max_width > 0.0 { prm.max_width } else { 0.04 * diag * prm.auto_scale };
+    let min_w = if prm.min_width > 0.0 { prm.min_width } else { 0.003 * diag };
     let kc = prm.curved_factor / max_w;
     let mut dih = vec![[0.0f64; 3]; nf];
     let mut kappa = vec![0.0f64; nf];
@@ -259,7 +265,7 @@ pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
     let (mut acc, mut wref) = (0.0, 0.0);
     for &r in &by_w { acc += r_area[r]; wref = r_w[r]; if acc >= 0.75 * total { break; } }
     rep.ref_width = wref;
-    let cand: Vec<bool> = (0..nreg).map(|r| r_elong[r] >= prm.min_elong && r_w[r] <= max_w).collect();
+    let cand: Vec<bool> = (0..nreg).map(|r| r_elong[r] >= prm.min_elong && r_w[r] <= max_w && r_w[r] >= min_w).collect();
     if std::env::var("FORGE_DBG").is_ok() { for r in 0..nreg { eprintln!("region {r}: area {:.2} len {:.2} w {:.3} elong {:.1} cand {} n {:?}", r_area[r], r_len[r], r_w[r], r_elong[r], cand[r], r_nrm[r]); } }
     // ---- clusters of candidates touching each other
     // two strips belong to the same band when they run side by side (long shared contact), turn gently
@@ -372,6 +378,7 @@ pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
         if tw <= 0.0 { why("no ridge between two flanks"); continue; }
         let _ = &used;
         let w = wsum / tw;
+        if w < min_w { why("narrower than the smallest band"); continue; }
         let len = (a_sum / w.max(1e-12)).max(w);
         if len < 1.5 * max_w { why("too short"); continue; }
         let size = sizes.iter().sum::<f64>() / tw;
@@ -407,4 +414,29 @@ pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
         if comp_band[c] >= 0 { rep.face_band[own[f] as usize] = comp_band[c]; }
     }
     rep
+}
+
+/// Runs the detector at three scales (widest band 4 %, 5.6 %, 8 % and 11 % of the diagonal) and keeps the finer result
+/// wherever bands of different scales cover the same faces. With an explicit `max_width` only that scale runs.
+pub fn detect(m: &PolyMesh, prm: &BandParams) -> BandReport {
+    let factors: &[f64] = if prm.max_width > 0.0 { &[1.0] } else { &[1.0, 1.4, 2.0, 2.8] };
+    let mut out = BandReport { face_band: vec![-1; m.sizes.len()], ..Default::default() };
+    for (si, &f) in factors.iter().enumerate() {
+        let mut p = prm.clone();
+        p.auto_scale = f;
+        // wide strips only count as edge breaks when they turn clearly (a gentle 15 deg sweep is just a smooth surface)
+        if f > 1.0 { p.min_turn_deg = p.min_turn_deg.max(20.0); }
+        let r = detect_one(m, &p);
+        if si == 0 { out.regions = r.regions; out.ref_width = r.ref_width; out.dbg_region = r.dbg_region.clone(); out.dbg_kappa = r.dbg_kappa.clone(); out.dbg_regions = r.dbg_regions.clone(); }
+        for (bi, b) in r.bands.iter().enumerate() {
+            let faces: Vec<usize> = (0..r.face_band.len()).filter(|&k| r.face_band[k] == bi as i32).collect();
+            if faces.is_empty() { continue; }
+            let taken = faces.iter().filter(|&&k| out.face_band[k] >= 0).count();
+            if taken * 4 > faces.len() { continue; }
+            let id = out.bands.len() as i32;
+            out.bands.push(b.clone());
+            for k in faces { if out.face_band[k] < 0 { out.face_band[k] = id; } }
+        }
+    }
+    out
 }

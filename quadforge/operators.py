@@ -351,7 +351,7 @@ class QUADFORGE_OT_detect_bands(bpy.types.Operator):
         text = bpy.data.texts.get("QuadForge Bands") or bpy.data.texts.new("QuadForge Bands")
         text.clear()
         lines = [f"Part size: {dims.x * mm_per_unit:.2f} x {dims.y * mm_per_unit:.2f} x {dims.z * mm_per_unit:.2f} mm  ({how})",
-                 f"Bands found: {len(bands)}   (widest searched: {(width_units or 0.04 * float(np.linalg.norm(np.array(dims)))) * mm_per_unit:.2f} mm)", "",
+                 f"Bands found: {len(bands)}   (widest searched: {(width_units or 0.112 * float(np.linalg.norm(np.array(dims)))) * mm_per_unit:.2f} mm)", "",
                  "  #  kind     side     width_mm  length_mm  turn   radius_mm  faces"]
         for i, b in enumerate(bands[:200]):
             lines.append(f"{i:3d}  {b['kind']:<8} {'convex' if b['convex'] else 'concave':<8} {b['width'] * mm_per_unit:8.2f} {b['length'] * mm_per_unit:10.2f} "

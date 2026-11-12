@@ -46,6 +46,7 @@ fn main() {
                 "--curved" => prm.curved_factor = v.parse().unwrap_or(prm.curved_factor),
                 "--narrow" => prm.narrow_ratio = v.parse().unwrap_or(prm.narrow_ratio),
                 "--max-width" => prm.max_width = v.parse().unwrap_or(0.0),
+                "--min-width" => prm.min_width = v.parse().unwrap_or(0.0),
                 "--link" => prm.link_deg = v.parse().unwrap_or(prm.link_deg),
                 "--elong" => prm.min_elong = v.parse().unwrap_or(prm.min_elong),
                 _ => { i += 1; continue; }

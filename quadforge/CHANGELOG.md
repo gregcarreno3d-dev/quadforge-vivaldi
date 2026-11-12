@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.3 - Chamfer and bevel detector, third preview
+
+- Tiny slivers (below 0.3 % of the part size, such as a 0.05 mm land under a chamfer) are no longer reported as bands, so a chamfer is painted completely or not at all instead of in pieces.
+- The detector now runs at several scales (widest band 4 %, 5.6 %, 8 % and 11 % of the part diagonal), so large soft rounds and wide chamfers that were left out are found too; finer results win where scales overlap, and wide strips must turn at least 20 degrees to count.
+- New option `--min-width` of `forge bands`. Still preview only: remeshing does not use the detector yet.
+
 ## 0.15.2 - Chamfer and bevel detector, second preview
 
 - The detector now also finds small rounded bevels (fillets of ~0.3 mm on rims) and measures each band on its own, so one model can have several chamfers and bevels of different angle and size; every band is reported with its own width, turn angle and radius.
