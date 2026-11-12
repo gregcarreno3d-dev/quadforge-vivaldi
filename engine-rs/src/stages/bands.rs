@@ -124,6 +124,11 @@ fn seg_seg(a: Vec3, b: Vec3, c: Vec3, d: Vec3) -> f64 {
     point_seg(a, c, d).min(point_seg(b, c, d)).min(point_seg(c, a, b)).min(point_seg(d, a, b))
 }
 
+/// Two curved faces belong to the same strip only when they turn around roughly the same axis (within 40 degrees).
+fn axis_ok(a: Option<Vec3>, b: Option<Vec3>) -> bool {
+    match (a, b) { (Some(x), Some(y)) => x.dot(y).abs() >= 0.766, _ => true }
+}
+
 fn cls_area(cfaces: &[Vec<usize>], area: &[f64], c: usize) -> f64 { cfaces[c].iter().map(|&f| area[f]).sum() }
 
 fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
@@ -189,7 +194,12 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
     let kc = prm.curved_factor / max_w;
     let mut dih = vec![[0.0f64; 3]; nf];
     let mut kappa = vec![0.0f64; nf];
+    // turning axis of every face: the direction the normal rotates around (normal x neighbour normal across the edge that
+    // bends most); a bevel keeps one axis along its length, a rounded corner of a post turns around another one
+    let mut axis: Vec<Option<Vec3>> = vec![None; nf];
+    let mut corner = vec![false; nf];
     for f in 0..nf {
+        let mut cand_axes: Vec<(f64, Vec3)> = Vec::new();
         for i in 0..3 {
             let g = adj[f][i];
             if g < 0 { dih[f][i] = 180.0; continue; }
@@ -199,8 +209,18 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
                 // distance between the two centroids measured across the shared edge (unfolded)
                 let gi = g as usize;
                 let dist = ((2.0 * area[f] + 2.0 * area[gi]) / elen[f][i].max(1e-12) / 2.0).max(1e-12);
-                kappa[f] = kappa[f].max(d.to_radians() / dist);
+                let kk = d.to_radians() / dist;
+                if d >= 3.0 { cand_axes.push((kk, nrm[f].cross(nrm[gi]).normalized())); }
+                if kk > kappa[f] {
+                    kappa[f] = kk;
+                    axis[f] = if d >= 3.0 { Some(nrm[f].cross(nrm[gi]).normalized()) } else { None };
+                }
             }
+        }
+        // a face that bends about two different axes with similar strength is a corner patch (torus / sphere-like)
+        if let Some(a1) = axis[f] {
+            let k1 = kappa[f];
+            corner[f] = cand_axes.iter().any(|&(k2, a2)| k2 >= 0.6 * k1 && a1.dot(a2).abs() < 0.64);
         }
     }
     // hysteresis: strongly curved faces seed the curved class, which grows over weakly curved neighbours
@@ -222,6 +242,9 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         let snapshot = curved.clone();
         for f in 0..nf {
             if snapshot[f] { continue; }
+            // only thin triangles (slivers inside a curved zone) are closed over, never a big flat facet next to a bevel
+            let longest = (0..3).map(|i| elen[f][i]).fold(0.0f64, f64::max).max(1e-12);
+            if 2.0 * area[f] / longest > 0.25 * max_w { continue; }
             let k = (0..3).filter(|&i| adj[f][i] >= 0 && dih[f][i] < prm.sharp_deg && snapshot[adj[f][i] as usize]).count();
             if k >= 2 { curved[f] = true; changed = true; }
         }
@@ -239,7 +262,7 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
                 let g = adj[f][i];
                 if g < 0 || reg[g as usize] >= 0 { continue; }
                 let g = g as usize;
-                if dih[f][i] < prm.sharp_deg && curved[f] == curved[g] { reg[g] = id; stack.push(g); }
+                if dih[f][i] < prm.sharp_deg && curved[f] == curved[g] && (!curved[f] || (corner[f] == corner[g] && axis_ok(axis[f], axis[g]))) { reg[g] = id; stack.push(g); }
             }
         }
     }
@@ -265,7 +288,9 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
     let (mut acc, mut wref) = (0.0, 0.0);
     for &r in &by_w { acc += r_area[r]; wref = r_w[r]; if acc >= 0.75 * total { break; } }
     rep.ref_width = wref;
-    let cand: Vec<bool> = (0..nreg).map(|r| r_elong[r] >= prm.min_elong && r_w[r] <= max_w && r_w[r] >= min_w).collect();
+    let mut r_corner = vec![true; nreg];
+    for f in 0..nf { if !corner[f] { r_corner[reg[f] as usize] = false; } }
+    let cand: Vec<bool> = (0..nreg).map(|r| r_elong[r] >= prm.min_elong && r_w[r] <= max_w && r_w[r] >= min_w && !(r_corner[r] && r_area[r] > 0.0)).collect();
     if std::env::var("FORGE_DBG").is_ok() { for r in 0..nreg { eprintln!("region {r}: area {:.2} len {:.2} w {:.3} elong {:.1} cand {} n {:?}", r_area[r], r_len[r], r_w[r], r_elong[r], cand[r], r_nrm[r]); } }
     // ---- clusters of candidates touching each other
     // two strips belong to the same band when they run side by side (long shared contact), turn gently
@@ -353,6 +378,7 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         }
         let w0 = 2.0 * a_sum / l_out;
         let (mut tsum, mut tw) = (0.0, 0.0);
+        let mut cvx = 0.0;
         let mut used: std::collections::HashSet<usize> = std::collections::HashSet::new();
         let mut sizes: Vec<f64> = Vec::new();
         let mut wsum = 0.0;
@@ -368,6 +394,8 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
                 if dbg && a_sum > 100.0 { eprintln!("   pair da {da:.2} db {db:.2} w0 {w0:.2} segsep {:.2} dist {:.2}+{:.2}", seg_seg(ea.pa, ea.pb, eb.pa, eb.pb), dist[k], dist[kg]); }
                 if da < 0.25 * w0 || db < 0.25 * w0 || da + db > 3.0 * w0 || seg_seg(ea.pa, ea.pb, eb.pa, eb.pb) < 0.6 * (da + db) { let _ = dsum; continue; }
                 tsum += angle(nrm[ea.g], nrm[eb.g]) * elen[f][i];
+                // convex when the two outer neighbours turn away from each other (their normals diverge as the surface runs on)
+                cvx += (nrm[eb.g] - nrm[ea.g]).dot(cen[eb.g] - cen[ea.g]) * elen[f][i];
                 tw += elen[f][i];
                 used.insert(src[k]); used.insert(src[kg]);
                 let mut size = |r: i32| { let r = r as usize; (if cand[r] { cls_area(&cfaces, &area, comp_of_region(&mut par, r)) } else { r_area[r] }).sqrt() };
@@ -400,18 +428,75 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         let bevel = curved_faces * 2 >= faces.len() || facet_turn >= 0.5 * len;
         let radius = if bevel { w / turn.to_radians() } else { 0.0 };
         bands.push((a_sum, Band {
-            kind: if bevel { "bevel" } else { "chamfer" }, convex: sgn > 0.0, faces: faces.len(), facets: comps[ci].len(),
+            kind: if bevel { "bevel" } else { "chamfer" }, convex: cvx > 0.0, faces: faces.len(), facets: comps[ci].len(),
             area: a_sum, width: w, length: len, turn_deg: turn, curvature_deg: curv, radius,
         }, ci));
     }
     bands.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     let mut comp_band = vec![-1i32; comps.len()];
-    for (i, (_, b, ci)) in bands.iter().enumerate() { comp_band[*ci] = i as i32; rep.bands.push(b.clone()); }
+    let mut bl: Vec<Band> = Vec::new();
+    for (i, (_, b, ci)) in bands.iter().enumerate() { comp_band[*ci] = i as i32; bl.push(b.clone()); }
+    let mut tb = vec![-1i32; nf];
     for f in 0..nf {
         let r = reg[f] as usize;
         if !cand[r] { continue; }
         let c = comp_of_region(&mut par, r);
-        if comp_band[c] >= 0 { rep.face_band[own[f] as usize] = comp_band[c]; }
+        if comp_band[c] >= 0 { tb[f] = comp_band[c]; }
+    }
+    // curved faces left over (the rounded corner patches between strips) join the neighbouring band that shares the most edge
+    for _ in 0..6 {
+        let snap = tb.clone();
+        let mut any = false;
+        for f in 0..nf {
+            if snap[f] >= 0 || !(curved[f] || corner[f]) { continue; }
+            let mut acc: HashMap<i32, f64> = HashMap::new();
+            for i in 0..3 {
+                let g = adj[f][i];
+                if g < 0 || snap[g as usize] < 0 || dih[f][i] >= prm.sharp_deg { continue; }
+                *acc.entry(snap[g as usize]).or_insert(0.0) += elen[f][i];
+            }
+            if let Some((&b, _)) = acc.iter().max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal)) { tb[f] = b; any = true; }
+        }
+        if !any { break; }
+    }
+    // touching bands of the same kind, side and similar size are one band (a fillet running round the corners of a part)
+    let nb = bl.len();
+    let mut bpar: Vec<usize> = (0..nb).collect();
+    for f in 0..nf {
+        if tb[f] < 0 { continue; }
+        for i in 0..3 {
+            let g = adj[f][i];
+            if g < 0 || tb[g as usize] < 0 || tb[g as usize] == tb[f] || angle(nrm[f], nrm[g as usize]) > prm.link_deg { continue; }
+            let (a, b) = (&bl[tb[f] as usize], &bl[tb[g as usize] as usize]);
+            let wr = if a.width > b.width { a.width / b.width.max(1e-12) } else { b.width / a.width.max(1e-12) };
+            if a.kind == b.kind && a.convex == b.convex && wr <= 1.25 && (a.turn_deg - b.turn_deg).abs() <= 12.0 {
+                let (x, y) = (find(&mut bpar, tb[f] as usize), find(&mut bpar, tb[g as usize] as usize));
+                if x != y { bpar[x] = y; }
+            }
+        }
+    }
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    let mut gid = vec![usize::MAX; nb];
+    for b in 0..nb { let r = find(&mut bpar, b); if gid[r] == usize::MAX { gid[r] = groups.len(); groups.push(Vec::new()); } groups[gid[r]].push(b); }
+    let mut merged: Vec<Band> = Vec::new();
+    let mut new_id = vec![0i32; nb];
+    for g in &groups {
+        let mut m = bl[g[0]].clone();
+        if g.len() > 1 {
+            let (mut a, mut w, mut t, mut l, mut fc, mut ft) = (0.0, 0.0, 0.0, 0.0, 0usize, 0usize);
+            for &b in g { let x = &bl[b]; a += x.area; w += x.width * x.area; t += x.turn_deg * x.area; l += x.length; fc += x.faces; ft += x.facets; }
+            m.area = a; m.width = w / a; m.turn_deg = t / a; m.length = l; m.faces = fc; m.facets = ft;
+            if m.kind == "bevel" { m.radius = m.width / m.turn_deg.to_radians(); m.curvature_deg = m.turn_deg; }
+        }
+        for &b in g { new_id[b] = merged.len() as i32; }
+        merged.push(m);
+    }
+    let mut order: Vec<usize> = (0..merged.len()).collect();
+    order.sort_by(|&x, &y| merged[y].area.partial_cmp(&merged[x].area).unwrap_or(std::cmp::Ordering::Equal));
+    let mut rank = vec![0i32; merged.len()];
+    for (r, &o) in order.iter().enumerate() { rank[o] = r as i32; rep.bands.push(merged[o].clone()); }
+    for f in 0..nf {
+        if tb[f] >= 0 { rep.face_band[own[f] as usize] = rank[new_id[tb[f] as usize] as usize]; }
     }
     rep
 }

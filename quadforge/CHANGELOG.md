@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.4 - Chamfer and bevel detector, fourth preview
+
+- Parts with rounded vertical corners plus fillets on the top and bottom edges (a rounded post on a plate) no longer melt into one curved network: strips are separated by the axis they turn around, rounded corner patches are shared out to the neighbouring strip and touching strips of the same kind and size are reported as one band.
+- Convex / concave is now judged from how the two neighbouring surfaces diverge, which no longer depends on triangle orientation.
+- Big flat facets next to a bevel are never pulled into it.
+
 ## 0.15.3 - Chamfer and bevel detector, third preview
 
 - Tiny slivers (below 0.3 % of the part size, such as a 0.05 mm land under a chamfer) are no longer reported as bands, so a chamfer is painted completely or not at all instead of in pieces.
