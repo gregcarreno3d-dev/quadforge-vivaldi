@@ -175,6 +175,61 @@ fn fit_sphere(pts: &[Vec3]) -> Option<(Vec3, f64)> {
     Some((o + c, r2.sqrt()))
 }
 
+
+/// Eigen-decomposition of a symmetric 3x3 matrix (Jacobi). Returns eigenvalues and eigenvectors (columns), ascending.
+fn eigen3(mut a: [[f64; 3]; 3]) -> ([f64; 3], [[f64; 3]; 3]) {
+    let mut v = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    for _ in 0..60 {
+        let (mut p, mut q, mut big) = (0, 1, 0.0f64);
+        for i in 0..3 { for j in i + 1..3 { if a[i][j].abs() > big { big = a[i][j].abs(); p = i; q = j; } } }
+        if big < 1e-14 { break; }
+        let th = 0.5 * (2.0 * a[p][q]).atan2(a[q][q] - a[p][p]);
+        let (c, s) = (th.cos(), th.sin());
+        for k in 0..3 { let (x, y) = (a[k][p], a[k][q]); a[k][p] = c * x - s * y; a[k][q] = s * x + c * y; }
+        for k in 0..3 { let (x, y) = (a[p][k], a[q][k]); a[p][k] = c * x - s * y; a[q][k] = s * x + c * y; }
+        for k in 0..3 { let (x, y) = (v[k][p], v[k][q]); v[k][p] = c * x - s * y; v[k][q] = s * x + c * y; }
+    }
+    let mut idx = [0usize, 1, 2];
+    idx.sort_by(|&x, &y| a[x][x].partial_cmp(&a[y][y]).unwrap_or(std::cmp::Ordering::Equal));
+    let w = [a[idx[0]][idx[0]], a[idx[1]][idx[1]], a[idx[2]][idx[2]]];
+    let mut vec = [[0.0; 3]; 3];
+    for (c, &i) in idx.iter().enumerate() { for k in 0..3 { vec[k][c] = v[k][i]; } }
+    (w, vec)
+}
+
+/// Cone through planar patches: their planes meet in one point (the apex) and their normals lie on a small circle.
+/// `planes` are (normal, point on plane, weight). Returns (apex, axis, half angle in degrees, worst plane distance of the apex).
+fn fit_cone(planes: &[(Vec3, Vec3, f64)]) -> Option<(Vec3, Vec3, f64, f64)> {
+    let wsum: f64 = planes.iter().map(|p| p.2).sum();
+    if planes.len() < 4 || wsum <= 0.0 { return None; }
+    let mean = planes.iter().fold(Vec3::ZERO, |a, p| a + p.0 * p.2) * (1.0 / wsum);
+    let mut cov = [[0.0; 3]; 3];
+    for (n, _, w) in planes {
+        let d = [n.x - mean.x, n.y - mean.y, n.z - mean.z];
+        for i in 0..3 { for j in 0..3 { cov[i][j] += w * d[i] * d[j] / wsum; } }
+    }
+    let (ev, vec) = eigen3(cov);
+    if ev[1] < 1e-3 { return None; } // normals do not spread over an arc
+    let mut axis = Vec3::new(vec[0][0], vec[1][0], vec[2][0]).normalized();
+    if axis.dot(mean) < 0.0 { axis = axis * -1.0; }
+    let cs: Vec<f64> = planes.iter().map(|p| p.0.dot(axis)).collect();
+    let c = cs.iter().zip(planes).map(|(c, p)| c * p.2).sum::<f64>() / wsum;
+    let sd = (cs.iter().zip(planes).map(|(x, p)| (x - c) * (x - c) * p.2).sum::<f64>() / wsum).sqrt();
+    if sd > 0.03 || c.abs() < 0.06 || c.abs() > 0.97 { return None; }
+    // apex: least-squares point on all planes
+    let mut a = vec![vec![0.0; 3]; 3];
+    let mut b = vec![0.0; 3];
+    for (n, p, w) in planes {
+        let nn = [n.x, n.y, n.z];
+        let d = n.dot(*p);
+        for i in 0..3 { for j in 0..3 { a[i][j] += w * nn[i] * nn[j]; } b[i] += w * nn[i] * d; }
+    }
+    let x = solve(a, b)?;
+    let apex = Vec3::new(x[0], x[1], x[2]);
+    let worst = planes.iter().map(|(n, p, _)| (n.dot(apex - *p)).abs()).fold(0.0, f64::max);
+    Some((apex, axis, c.abs().acos().to_degrees(), worst))
+}
+
 struct Tris {
     wp: Vec<Vec3>,
     tv: Vec<[u32; 3]>,
@@ -334,7 +389,7 @@ pub fn analyze(m: &PolyMesh, prm: &SurfParams) -> SurfaceReport {
                 let rad = rad - ax * rad.dot(ax);
                 if rad.length() < 4.0 * tol { return false; }
                 let tg = ax.cross(rad).normalized();
-                p_nrm[q].dot(tg).abs() < 0.12
+                p_nrm[q].dot(tg).abs() < 0.05
             }).collect();
             let mut seen = vec![false; np];
             for s0 in 0..np {
@@ -479,20 +534,39 @@ pub fn analyze(m: &PolyMesh, prm: &SurfParams) -> SurfaceReport {
         let (sxx, sxy) = rh.iter().fold((0.0, 0.0), |a, x| (a.0 + (x.0 - mh) * (x.0 - mh), a.1 + (x.0 - mh) * (x.1 - mr)));
         let k = if sxx > 1e-12 { sxy / sxx } else { 0.0 };
         let lin = rh.iter().map(|x| (x.1 - (mr + k * (x.0 - mh))).abs()).fold(0.0, f64::max);
+        let sph_pts: Vec<Vec3> = set.iter().map(|&v| t.wp[v as usize]).collect();
+        let sphere = fit_sphere(&sph_pts).filter(|(c, r)| *r > 3.0 * tol && sph_pts.iter().all(|p| (p.distance(*c) - r).abs() <= 2.0 * tol));
+        if let Some((c, r)) = sphere {
+            if rmax - rmin > 2.0 * tol && lin > 2.0 * tol {
+                gk.push(("sphere", c, Vec3::ZERO, r, 0.0, 0.0));
+                continue;
+            }
+        }
         let kind = if rmax - rmin <= 2.0 * tol { "cylinder" } else if lin <= 2.0 * tol { "cone" } else { "revolution" };
-        let ang = if kind == "cone" { k.atan().to_degrees() } else { 0.0 };
+        let ang = if kind == "cone" { k.atan().abs().to_degrees() } else { 0.0 };
         gk.push((kind, *mid, *ax, if kind == "cylinder" { mr } else { rmax }, if kind == "cone" { ang } else { 360.0 }, 0.0));
     }
+    let p_cen_early = |q: usize| -> Vec3 { let mut sm = Vec3::ZERO; let mut w = 0.0; for &f in &p_tris[q] { let c = t.tv[f].iter().map(|&v| t.wp[v as usize]).fold(Vec3::ZERO, |a, b| a + b) * (1.0 / 3.0); sm += c * t.area[f]; w += t.area[f]; } sm * (1.0 / w.max(1e-30)) };
     for list in &comps {
         if list.len() >= 4 {
             let mut set: HashSet<u32> = HashSet::new();
             for &q in list { for &v in &p_verts[q] { set.insert(v); } }
             let pts: Vec<Vec3> = set.into_iter().map(|v| t.wp[v as usize]).collect();
             let tol_s = 2.0 * tol;
-            let sph = fit_sphere(&pts).filter(|(c, r)| *r > 3.0 * tol && pts.iter().all(|p| (p.distance(*c) - r).abs() <= tol_s));
+            let planes: Vec<(Vec3, Vec3, f64)> = list.iter().map(|&q| (p_nrm[q], p_cen_early(q), p_area[q])).collect();
+            let cone = fit_cone(&planes).filter(|&(_, _, _, worst)| worst <= 2.0 * tol);
+            let sph = if cone.is_some() { None } else {
+                fit_sphere(&pts).filter(|(c, r)| {
+                    *r > 3.0 * tol && pts.iter().all(|p| (p.distance(*c) - r).abs() <= tol_s)
+                        && list.iter().all(|&q| { let d = p_cen_early(q) - *c; d.length() > 1e-9 && p_nrm[q].dot(d.normalized()).abs() > 0.978 })
+                })
+            };
             let g = gk.len() as i32;
             for &q in list { group[q] = g; }
-            if let Some((c, r)) = sph {
+            if let Some((apex, axis, half, worst)) = cone {
+                // half angle between the axis and the surface line = 90 - angle between normal and axis
+                gk.push(("cone", apex, axis, 0.0, 90.0 - half, worst / t.diag));
+            } else if let Some((c, r)) = sph {
                 let e = pts.iter().map(|p| (p.distance(c) - r).abs()).fold(0.0, f64::max);
                 gk.push(("sphere", c, Vec3::ZERO, r, 0.0, e / t.diag));
             } else {
@@ -678,6 +752,76 @@ mod tests {
         idx.extend((0..n).map(|k| (2 * k + 1) as i32));
         sizes.push(n as i32);
         PolyMesh { p, sizes, idx, ..Default::default() }
+    }
+
+    fn frustum(n: usize, r0: f64, r1: f64, h: f64) -> PolyMesh {
+        let mut p = Vec::new();
+        for k in 0..n {
+            let a = std::f64::consts::TAU * k as f64 / n as f64;
+            p.push(Vec3::new(r0 * a.cos(), r0 * a.sin(), 0.0));
+            p.push(Vec3::new(r1 * a.cos(), r1 * a.sin(), h));
+        }
+        let mut idx: Vec<i32> = Vec::new();
+        let mut sizes: Vec<i32> = Vec::new();
+        for k in 0..n {
+            let k2 = (k + 1) % n;
+            idx.extend_from_slice(&[(2 * k) as i32, (2 * k2) as i32, (2 * k2 + 1) as i32, (2 * k + 1) as i32]);
+            sizes.push(4);
+        }
+        idx.extend((0..n).rev().map(|k| (2 * k) as i32));
+        sizes.push(n as i32);
+        idx.extend((0..n).map(|k| (2 * k + 1) as i32));
+        sizes.push(n as i32);
+        PolyMesh { p, sizes, idx, ..Default::default() }
+    }
+
+    #[test]
+    fn polygonal_frustum_is_a_cone() {
+        let m = frustum(24, 8.0, 4.0, 6.0);
+        let r = analyze(&m, &SurfParams::default());
+        let kinds: Vec<_> = r.surfaces.iter().map(|s| s.kind).collect();
+        assert_eq!(kinds.iter().filter(|k| **k == "cone").count(), 1, "{:?}", kinds);
+        let c = r.surfaces.iter().find(|s| s.kind == "cone").unwrap();
+        let expect = (4.0f64 / 6.0).atan().to_degrees();
+        assert!((c.sweep - expect).abs() < 0.5, "half angle {} expected {}", c.sweep, expect);
+    }
+
+    #[test]
+    fn uv_sphere_is_a_sphere() {
+        let (nu, nv, r) = (24usize, 14usize, 6.0f64);
+        let mut p = vec![Vec3::new(0.0, 0.0, r), Vec3::new(0.0, 0.0, -r)];
+        for j in 1..nv {
+            let th = std::f64::consts::PI * j as f64 / nv as f64;
+            for i in 0..nu {
+                let a = std::f64::consts::TAU * i as f64 / nu as f64;
+                p.push(Vec3::new(r * th.sin() * a.cos(), r * th.sin() * a.sin(), r * th.cos()));
+            }
+        }
+        let at = |j: usize, i: usize| (2 + (j - 1) * nu + i % nu) as i32;
+        let (mut idx, mut sizes) = (Vec::new(), Vec::new());
+        for i in 0..nu { idx.extend_from_slice(&[0, at(1, i), at(1, i + 1)]); sizes.push(3); }
+        for j in 1..nv - 1 { for i in 0..nu {
+            idx.extend_from_slice(&[at(j, i), at(j + 1, i), at(j + 1, i + 1)]); sizes.push(3);
+            idx.extend_from_slice(&[at(j, i), at(j + 1, i + 1), at(j, i + 1)]); sizes.push(3);
+        } }
+        for i in 0..nu { idx.extend_from_slice(&[1, at(nv - 1, i + 1), at(nv - 1, i)]); sizes.push(3); }
+        let m = PolyMesh { p, sizes, idx, ..Default::default() };
+        let rep = analyze(&m, &SurfParams::default());
+        let kinds: Vec<_> = rep.surfaces.iter().map(|s| s.kind).collect();
+        assert_eq!(kinds.iter().filter(|k| **k == "sphere").count(), 1, "{:?}", kinds);
+    }
+
+    #[test]
+    fn tilted_frustum_is_a_cone_too() {
+        let mut m = frustum(24, 8.0, 4.0, 6.0);
+        let (c, s) = (20.0f64.to_radians().cos(), 20.0f64.to_radians().sin());
+        for p in m.p.iter_mut() { *p = Vec3::new(p.x, c * p.y - s * p.z, s * p.y + c * p.z); }
+        let r = analyze(&m, &SurfParams::default());
+        let kinds: Vec<_> = r.surfaces.iter().map(|s| s.kind).collect();
+        assert_eq!(kinds.iter().filter(|k| **k == "cone").count(), 1, "{:?}", kinds);
+        let cone = r.surfaces.iter().find(|s| s.kind == "cone").unwrap();
+        let expect = (4.0f64 / 6.0).atan().to_degrees();
+        assert!((cone.sweep - expect).abs() < 0.5, "half angle {} expected {}", cone.sweep, expect);
     }
 
     #[test]

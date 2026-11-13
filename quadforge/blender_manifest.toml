@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "quadforge"
-version = "0.16.1"
+version = "0.16.2"
 name = "QuadForge Vivaldi"
 tagline = "Fast quad and triangle remesher with its own engine"
 maintainer = "Gregorio Carreño <gregcarr3dwork@gmail.com>"

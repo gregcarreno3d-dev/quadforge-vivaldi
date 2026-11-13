@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.2
+- Surface analysis: cones are now fitted directly from the planes of faceted frustums (also tilted ones), true spheres are no longer taken for surfaces of revolution, and a stricter revolution test avoids mislabelling cones and spheres.
+- Engine unit tests for cylinder, frustum, tilted frustum and sphere.
+
 ## 0.16.1
 - Faster remesh on CAD parts with a hard size variation: when softening the density made the grid fit worse, the engine now stops after the second attempt and goes straight to the fallback (a real CAD plate dropped from 26 s to 12 s, same result).
 - Use Surface Analysis no longer marks the sides of chamfers or bevels narrower than one quad (the quads cannot follow them), which gives fewer triangles.
