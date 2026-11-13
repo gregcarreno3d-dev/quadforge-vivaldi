@@ -1,4 +1,4 @@
-# QuadForge Vivaldi — version 0.15.4
+# QuadForge Vivaldi — version 0.15.5
 
 > Entry document for any person or AI receiving this add-on. Read it first; details are in `docs/`.
 
@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Name | **QuadForge Vivaldi** (internal extension id: `quadforge`; it does not change, so upgrades keep working) |
-| Version | **0.15.4** (series name: *Vivaldi*) |
+| Version | **0.15.5** (series name: *Vivaldi*) |
 | Author | GregCarreno3D |
 | License | GPL-3.0-or-later |
 | Requires | Blender 4.2 or newer |

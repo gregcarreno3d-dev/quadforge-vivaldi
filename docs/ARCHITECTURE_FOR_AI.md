@@ -1,6 +1,6 @@
 # QuadForge Vivaldi: architecture and behaviour, written for AI assistants
 
-Version described: **0.15.4** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.15.5** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are

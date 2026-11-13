@@ -382,6 +382,7 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         let mut used: std::collections::HashSet<usize> = std::collections::HashSet::new();
         let mut sizes: Vec<f64> = Vec::new();
         let mut wsum = 0.0;
+        let mut same_flank = 0.0;
         for (k, &f) in faces.iter().enumerate() {
             for i in 0..3 {
                 let g = adj[f][i];
@@ -397,6 +398,16 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
                 // convex when the two outer neighbours turn away from each other (their normals diverge as the surface runs on)
                 cvx += (nrm[eb.g] - nrm[ea.g]).dot(cen[eb.g] - cen[ea.g]) * elen[f][i];
                 tw += elen[f][i];
+                // flanks that are curved about the same axis as the band are one wall (a flat or a ridge on a cylinder), not two surfaces
+                let same_surface = ea.rg == eb.rg || {
+                    let bax = nrm[ea.g].cross(nrm[eb.g]);
+                    let bl = bax.dot(bax).sqrt();
+                    bl > 1e-6 && match (axis[ea.g], axis[eb.g]) {
+                        (Some(x), Some(y)) => curved[ea.g] && curved[eb.g] && (x.dot(bax) / bl).abs() > 0.9 && (y.dot(bax) / bl).abs() > 0.9,
+                        _ => false,
+                    }
+                };
+                if same_surface { same_flank += elen[f][i]; }
                 used.insert(src[k]); used.insert(src[kg]);
                 let mut size = |r: i32| { let r = r as usize; (if cand[r] { cls_area(&cfaces, &area, comp_of_region(&mut par, r)) } else { r_area[r] }).sqrt() };
                 sizes.push(size(ea.rg).max(size(eb.rg)) * elen[f][i]);
@@ -412,6 +423,8 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         let size = sizes.iter().sum::<f64>() / tw;
         if w > prm.narrow_ratio * size { why(&format!("wider than its neighbours (w {w:.3}, neighbour size {size:.3})")); continue; }
         let turn = tsum / tw;
+        if dbg { eprintln!("cluster {ci}: same-flank share {:.2}", same_flank / tw); }
+        if same_flank > 0.6 * tw { why("both flanks are the same surface (a flat or groove inside one region)"); continue; }
         if turn < prm.min_turn_deg || turn > prm.max_turn_deg { why(&format!("turn {turn:.0} out of range")); continue; }
         // bevel or chamfer: curved-class faces, or facets that turn against each other
         let curved_faces = faces.iter().filter(|&&f| curved[f]).count();
@@ -427,6 +440,7 @@ fn detect_one(m: &PolyMesh, prm: &BandParams) -> BandReport {
         let curv = if curved_faces * 2 >= faces.len() { turn } else { 0.0 };
         let bevel = curved_faces * 2 >= faces.len() || facet_turn >= 0.5 * len;
         let radius = if bevel { w / turn.to_radians() } else { 0.0 };
+        if dbg { eprintln!("cluster {ci}: ACCEPTED area {a_sum:.2} w {w:.3} len {len:.2} neighbour size {size:.3} turn {turn:.1} facets {}", comps[ci].len()); }
         bands.push((a_sum, Band {
             kind: if bevel { "bevel" } else { "chamfer" }, convex: cvx > 0.0, faces: faces.len(), facets: comps[ci].len(),
             area: a_sum, width: w, length: len, turn_deg: turn, curvature_deg: curv, radius,

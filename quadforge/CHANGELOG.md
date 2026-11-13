@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.5
+- Chamfer and bevel detector: a flat or a ridge cut into a cylinder wall (for example a D-shaped flat inside a hole) is no longer reported as a chamfer. A band is now rejected when both of its flanks are curved about the same axis as the band itself, which means they are one wall and not two surfaces.
+- Debug output (`FORGE_BANDS_DEBUG=1`) also lists the accepted bands with their measurements.
+
 ## 0.15.4 - Chamfer and bevel detector, fourth preview
 
 - Parts with rounded vertical corners plus fillets on the top and bottom edges (a rounded post on a plate) no longer melt into one curved network: strips are separated by the axis they turn around, rounded corner patches are shared out to the neighbouring strip and touching strips of the same kind and size are reported as one band.
