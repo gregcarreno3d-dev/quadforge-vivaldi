@@ -657,6 +657,28 @@ pub fn analyze(m: &PolyMesh, prm: &SurfParams) -> SurfaceReport {
         }
         // drop the surfaces that became empty (their area is zero after the loop below, then they are removed in the renumbering)
     }
+    // neighbouring spheres with the same centre and radius are one sphere (a pole cap cut off by fine fans)
+    {
+        let mut to: Vec<i32> = (0..surfaces.len() as i32).collect();
+        for f in 0..nf {
+            for i in 0..3 {
+                let g = t.adj[f][i];
+                if g < 0 { continue; }
+                let (a, b) = (tsurf[f], tsurf[g as usize]);
+                if a < 0 || b < 0 || a == b { continue; }
+                let (sa, sb) = (&surfaces[a as usize], &surfaces[b as usize]);
+                if sa.kind != "sphere" || sb.kind != "sphere" { continue; }
+                let d = Vec3::new(sa.center[0] - sb.center[0], sa.center[1] - sb.center[1], sa.center[2] - sb.center[2]).length();
+                if d <= 2.0 * tol && (sa.radius - sb.radius).abs() <= 2.0 * tol {
+                    let (mut ra, mut rb) = (a, b);
+                    while to[ra as usize] != ra { ra = to[ra as usize]; }
+                    while to[rb as usize] != rb { rb = to[rb as usize]; }
+                    if ra != rb { to[ra.max(rb) as usize] = ra.min(rb); }
+                }
+            }
+        }
+        for f in 0..nf { if tsurf[f] >= 0 { let mut r = tsurf[f]; while to[r as usize] != r { r = to[r as usize]; } tsurf[f] = r; } }
+    }
     // planes: refine centre / normal over all of their triangles
     for (sid, s) in surfaces.iter_mut().enumerate() {
         let mut lo = Vec3::new(f64::MAX, f64::MAX, f64::MAX);
