@@ -318,6 +318,17 @@ impl<'a, 'g> Extractor<'a, 'g> {
             param_ok = ip.run(rho, &mut pr);
             // a size gradient the surface cannot follow (it needs singularities the field does not have)
             // makes the fit fail: follow only part of it instead
+            // softening that does not improve the fit (the error grows as the power falls) is a dead end: do not
+            // spend three more solves on it when even the best attempt is far too poor
+            if param_ok && has_dens {
+                if let Some(&(_, prev)) = tried.last() {
+                    if pr.face_error >= prev * 0.97 && prev > 0.5 {
+                        if dbg() { eprintln!("param: softening does not help ({prev:.3} -> {:.3}), giving up on the density", pr.face_error); }
+                        self.pr = pr;
+                        return Err("the size variation is too strong for a regular grid on this shape".into());
+                    }
+                }
+            }
             if !param_ok || !has_dens || self.dens_pow <= 0.0 || pr.face_error <= 0.45 { break; }
             if dbg() { eprintln!("param: density fit {:.3} too poor at power {:.2}, softening", pr.face_error, self.dens_pow); }
             tried.push((self.dens_pow, pr.face_error));

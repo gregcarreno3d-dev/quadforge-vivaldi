@@ -83,7 +83,9 @@ faces between big surfaces and tell them apart: **orange = chamfer** (flat), **b
 table of widths, lengths, turn angles and radii is written to a text datablock, and every face gets a `qf_band`
 attribute. Today it is a preview: the remesher does not use it yet; that is the next development step.
 
-![Chamfers (orange) and bevels (blue) detected on four test parts with version 0.15.3](docs/images/bands_0.15.jpg)
+![Surfaces found on three test parts with version 0.16: planes grey-blue, cylinders green, surfaces of revolution teal, chamfers orange, bevels blue (illustrative renders of the analysis output)](docs/images/surfaces_0.16.jpg)
+
+![Chamfers (orange) and bevels (blue) detected on four test parts in Blender with version 0.15.3](docs/images/bands_0.15.jpg)
 
 Details: [`SURFACE_ANALYSIS.md`](quadforge/docs/SURFACE_ANALYSIS.md) and [`CHAMFER_BEVEL_DETECTOR.md`](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md).
 

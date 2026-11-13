@@ -72,11 +72,22 @@ def face_kind_codes(face_surface: np.ndarray, surfaces: list) -> np.ndarray:
     return codes[face_surface + 1]
 
 
-def border_edge_codes(arrays, face_surface: np.ndarray, borders: list) -> np.ndarray:
-    """Per edge: 0 = inside a surface, 1 sharp, 2 tangent, 3 band border."""
+def border_edge_codes(arrays, face_surface: np.ndarray, borders: list, surfaces: list | None = None,
+                      bands: list | None = None, min_band_width: float = 0.0) -> np.ndarray:
+    """Per edge: 0 = inside a surface, 1 sharp, 2 tangent, 3 band border.
+
+    With ``min_band_width`` the sides of bands narrower than that (mesh units) are left out: the quads cannot follow them.
+    """
     first, second, counts = geo.edge_face_pairs(arrays)
     codes = np.zeros(arrays.n_edges, dtype=np.int32)
-    kind_of = {(b["a"], b["b"]): BORDER_CODES.get(b["kind"], 1) for b in borders}
+    kind_of = {}
+    for b in borders:
+        code = BORDER_CODES.get(b["kind"], 1)
+        if code == 3 and min_band_width > 0 and surfaces is not None and bands is not None:
+            widths = [bands[surfaces[i]["band"]]["width"] for i in (b["a"], b["b"]) if surfaces[i]["band"] >= 0]
+            if widths and min(widths) < min_band_width:
+                code = 0
+        kind_of[(b["a"], b["b"])] = code
     two = np.flatnonzero(counts == 2)
     if not two.size:
         return codes

@@ -95,6 +95,7 @@ class RemeshSettings:
     sharp_angle_deg: float = 35.0
     use_existing_sharp: bool = True
     soft_bevels: bool = True                 # keep the rows along rounded bevels made of shallow facets
+    surface_band_min_cells: float = 1.0      # bands narrower than this many quad lengths do not get hard sides
     surface_band_sides: bool = True          # with the analysis: keep both sides of every chamfer / bevel as hard edges
     use_surface_analysis: bool = False       # experimental: surface borders and chamfer/bevel sides become hard edges (CAD meshes)
     relax_quads: bool = True         # even out badly shaped quads and put them back on the surface
@@ -577,7 +578,9 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
             from . import surfaces as surf
             sizes = np.diff(arrays.poly_offsets).astype(np.int32)
             face_surface, report = surf.analyze_arrays(arrays.co, sizes, arrays.loop_verts.astype(np.int32))
-            codes = surf.border_edge_codes(arrays, face_surface, report["borders"])
+            quad_length = geo.quad_edge_length(float(geo.polygon_normals_areas(arrays)[1].sum()), max(settings.target_quads, 1))
+            codes = surf.border_edge_codes(arrays, face_surface, report["borders"], report["surfaces"],
+                                           report["bands"]["bands"], settings.surface_band_min_cells * quad_length)
             border = codes == surf.BORDER_CODES["sharp"]
             if settings.surface_band_sides:
                 border |= codes == surf.BORDER_CODES["band"]

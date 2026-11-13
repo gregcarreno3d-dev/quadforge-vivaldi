@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.1
+- Faster remesh on CAD parts with a hard size variation: when softening the density made the grid fit worse, the engine now stops after the second attempt and goes straight to the fallback (a real CAD plate dropped from 26 s to 12 s, same result).
+- Use Surface Analysis no longer marks the sides of chamfers or bevels narrower than one quad (the quads cannot follow them), which gives fewer triangles.
+- README: new image of the surface analysis.
+
 ## 0.16.0
 - **Surface analysis (preview).** New engine command `forge surfaces` and panel *Surface Analysis*: the whole model is split into surfaces (plane, cylinder, sphere, cone, revolution, free-form, chamfer, bevel) with borders between them (sharp, tangent, band). Coarse polygonal cylinders are recognised as one cylinder; spool-like walls as one surface of revolution.
 - Blender: *Analyze Surfaces*, colours by type or by surface, *Select Faces* by kind, *Select Borders* by kind, text table *QuadForge Surfaces*, attributes `qf_surface`, `qf_surface_kind`, `qf_border`.
