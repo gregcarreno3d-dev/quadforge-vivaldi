@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.16.2
+- **Name:** the add-on is now simply **QuadForge** (the series name "Vivaldi" is gone). The extension id stays `quadforge`, so upgrades keep working. Package names are `quadforge-<version>-<platform>.zip`; the repository moves to `gregcarreno3d-dev/quadforge` (GitHub redirects the old address).
+- Documentation brought up to date: new README for the add-on, entry document, user guide, status and limits, surface analysis, detector, architecture and `llms.txt`; new image of the surface analysis and the Hard Surface remesh on CAD parts (`docs/images/cad_0.16.jpg`).
 - Surface analysis: neighbouring spheres with the same centre and radius are merged (a sphere cap was split in two near the pole).
 - With Use Surface Analysis the result's neighbouring triangle pairs are joined into quads when they lie on one smooth patch. Most leftover triangles (about 2 % of faces on real CAD parts) are isolated singular ones, which this cannot remove; they are still on the list.
 - Surface analysis: cones are now fitted directly from the planes of faceted frustums (also tilted ones), true spheres are no longer taken for surfaces of revolution, and a stricter revolution test avoids mislabelling cones and spheres.
@@ -249,51 +251,51 @@ Tried and not adopted
 ## 0.10.8
 - Engine: virtual subdivision of stretched triangles before lattice cell extraction; removes most holes and high-valence stars at finger tips (hand 118K: 280 → ~60 poles).
 
-## 0.10.7 "Vivaldi" — Finger tips: no more many-spoke stars
+## 0.10.7 — Finger tips: no more many-spoke stars
 - **Reported**: on the hand at 120 000 quads the finger tips showed star points with many lines meeting in one vertex.
 - **Cause**: small holes the grid method could not close (thin, curved regions at the tips) were filled with a fan, which makes one vertex with 12 to 38 spokes (valence 8 in the best case).
 - **Fix**: every vertex with 7 or more spokes is replaced by a regular quad patch with the same outline. The patch shape and its corners are chosen to keep the neighbouring valences close to 4 and the patch sides about square (not thin ladders); new points are relaxed on the surface. Hand at 120 000 quads: no vertex above valence 8 remains except one case, quads below the quality threshold 287 -> 169, bad corners 1078 -> 905. The replaced stars turn into several 5-valent vertices spread around the patch, which look much calmer than one star.
 - The dead-end merge now repeats until nothing is left to merge (it left some pinched fans), and refuses merges that would give a quad with a repeated corner.
 - Not solved yet: why the grid method leaves holes at the tips at this size (at 20 000 quads the tips are clean 3-valent points). Switch `FORGE_NOSTAR=1` turns the new step off for comparison.
 
-## 0.10.7 "Vivaldi" — Plate with Hard Edges at 30 degrees
+## 0.10.7 — Plate with Hard Edges at 30 degrees
 - **Reported**: the plate with Hard Edges (30 degrees) at 120 000 quads still came out with about 70 irregular vertices per 1000 (pairing method). Thanks to the fallback message added in 0.10.4 the reason was visible: "grid solve failed: extraction produced no faces".
 - **Cause**: the isotropic remesh left two triangles of zero area on that model and size; the grid solve divided by their area and every number became NaN. Zero-area triangles are now skipped in the grid solve and its error measure (they carry no information). The same job now stays on the grid method (about 2 irregular vertices per 1000).
 - Also: the "density fit" check could trigger needless retries when its measure was NaN; it no longer does.
 
-## 0.10.7 "Vivaldi" — Meshes with flat sliver triangles and tiny holes
+## 0.10.7 — Meshes with flat sliver triangles and tiny holes
 - **Cause of the reported pairing-path result** (hand about 70 irregular vertices per 1000): the hand file contains two isolated flat triangles (all three vertices on a line, 0.1 unit edges) that belong to no surface. They looked like tiny open holes, which sent the whole job to the pairing method. The engine now removes isolated flat slivers before anything else (`removed_slivers` in the statistics). The same file now stays on the grid method: 2.4 irregular vertices per 1000 at 120 000 quads with Hard Edges on (full add-on run, about 59 s on the 2-core test machine).
 - Meshes whose only open borders are short loops (small holes) are now closed and remeshed on the grid method too (`closed_holes`), instead of silently using the pairing method. Long borders still use the capping path from 0.10.0.
 - The fallback reason is reported for every pairing result, including open borders and disabled alignment.
 
-## 0.10.7 "Vivaldi" — Fallback diagnostics
+## 0.10.7 — Fallback diagnostics
 - **Reported**: with 0.10.3 the hand and the plate (quads, about 120 000, Hard Edges) came out with about 70 irregular vertices per 1000, which is the old pairing method; the same jobs give 2-2.5 per 1000 in the test machine. The cause on the reporting machine is not known yet.
 - The engine now says why it left the grid method (`fallback` field in its statistics) and the panel shows it as a warning ("Reason: ..."). Please send that text when you see it.
 - No change to the results when the grid method works.
 
-## 0.10.7 "Vivaldi" — Version shown in the panel
+## 0.10.7 — Version shown in the panel
 - The panel title now reads `QuadForge 0.10.7`, so a screenshot always tells which build made the result. The number is read from `blender_manifest.toml` at load time (single source of truth, cannot drift). No engine change.
 
-## 0.10.2 "Vivaldi" — Multi-core grid solver
+## 0.10.2 — Multi-core grid solver
 - **The grid solve now uses all CPU cores** (it was single-threaded and is the longest stage on big models). Same results as before, bit for bit on the checked models; on the 2-core test machine the hand at 60 000 quads went from 30.5 s to 22.4 s, and a desktop CPU with more cores gains more. Models under about 40 000 unknowns still use the single-thread path.
 - **Time limit** raised to 900 s (`--time-limit`): it is only a guard against runaway jobs now, because a fallback after minutes of waiting gave the worst of both worlds. Seen in the reported case: 0.9.0 spent 216 s on the plate at 120 000 quads and ended on the old pairing path (68 poles per 1000); 0.10.x finishes the same job on the good path (2.3 poles per 1000 in about 90 s on the 2-core machine, less with more cores).
 - Checked: a model that is already a quad mesh of about the target size is remeshed on the good path (hand 118 829 -> 120 000 quads: 3 poles per 1000). If the target is not lower than the detail the add-on may return the input unchanged (the panel warns about it); that is the add-on's decision, not the engine's.
 
-## 0.10.1 "Vivaldi" — Large models with hard edges no longer look frozen
+## 0.10.1 — Large models with hard edges no longer look frozen
 - **Reported problem**: with Hard Edges on and a large quad count (plate), the progress bar sat at about 65% for minutes. The engine was not stuck; the grid solve produced no progress messages and took long.
 - **Progress** is now reported through every phase of the grid solve (preparing, solving, singular points, seams, hard edges, finishing), so the bar keeps moving.
 - **Faster**: the first size estimate was about 3% low and triggered a second full solve at almost every size; the estimate is now corrected and large jobs accept a 6% count error. Plate with marked edges at 100 000 quads: 78 s (about 145 s before). Typical sizes (4000–20 000) are unchanged or a little faster.
 - **Time limit**: if one grid solve takes longer than 240 s (`--time-limit`, 0 = none) the engine falls back to the pairing path, which finishes in seconds, instead of working for minutes. Esc still cancels at any time.
 - The dead-end vertex merge (two quads around a valence-2 vertex become one) is documented as on by default (`FORGE_NOMERGE2=1` disables it); it was active in 0.10.0 already.
 
-## 0.10.0 "Vivaldi" — Open borders and quad quality
+## 0.10.0 — Open borders and quad quality
 - **Meshes with open borders now use the integer-grid method** (wrists, cut models, half models for symmetry, clothes). The border loops are closed with temporary caps, aligned like hard edges, and the caps are removed after extraction. Checked on the hand with an open wrist, the ant cut in half and the plate with its top removed: all give a clean border loop, a few hundred quads per thousand away from poles are regular, and only a handful of bad quads. Loops shorter than 6 quad edges are closed.
 - **Quad shape optimiser**: vertices next to badly shaped quads are moved to maximise the worst Jacobian. Inverted quads on the ant disappear; hand and plate have no quad below Jacobian 0.5.
 - Border triangles can appear where very short edges had to be welded (open meshes only).
 - Tests: border cases added to the engine tests (hemisphere stays one loop), fuzz test accepts border triangles on open meshes; Blender tests 28/28.
 - Honest notes: pole counts of the ant move a few points up or down between sizes (34–43 per 1000 at 4000 quads) depending on tiny numerical differences; the geometric field weights are neutral on average. Experimental switches are documented in `docs/FORGE_ENGINE.md`.
 
-## 0.9.0 "Vivaldi" — Adaptive size and density in the integer-grid method
+## 0.9.0 — Adaptive size and density in the integer-grid method
 - **Thin, curved parts get smaller quads** (thickness by the shrinking-ball method, only where the surface is curved like a tube). Measured on the bull ant: poles stay the same (4000 quads: 34.7 per 1000 vs 37.0 without; 20 000: 11.6 vs 10.9), leg tips and silhouettes get more quads. Honest: this is a modest gain, the ragged thin legs are not solved at 4000 quads. `--no-adaptive` turns it off.
 - **Density groups now use the integer-grid method** (before, any density went to the pairing path). On the hand with a 3:1 density the quads grow smoothly from 1.8 to 4.4 units edge length with about 12 poles per 1000 quads and fluid loops. On shapes with few singularities (a sphere) a strong gradient cannot be followed; the engine detects that and uses the pairing path.
 - **Bug fix**: when the integer-grid method failed and the engine fell back to pairing, it returned triangles instead of quads. Fixed; results with open edges are now rejected too.
@@ -301,7 +303,7 @@ Tried and not adopted
 - Plate with marked edges at 20 000 quads: 3.8 poles per 1000 (4.7 in 0.8). Hand 20 000: 3.9 (3.6 in 0.8, within noise).
 - Tests: density gradients on a sphere (valid quads in every case), engine tests t01–t06, Blender tests 28/28.
 
-## 0.8.0 "Vivaldi" — Hard-edge alignment in the integer-grid method
+## 0.8.0 — Hard-edge alignment in the integer-grid method
 - **Marked sharp edges now go through the integer-grid method** (before, any model with marked edges fell back to the pairing path). The cross field is aligned to the marked edges, each feature edge gets a constraint that keeps one lattice coordinate constant along it, those coordinates are rounded to integers, and cells are snapped to the feature lines and corners. Only chains of at least 6 edge lengths count as features; tiny marked edges are ignored. `--no-align` switches this off.
 - **Measured**: hard-surface plate with marked edges, 4000 quads: 17.9 poles per 1000 (QuadriFlow 20, and it ignores the edges). Hand at 20 000: 2.7–3.6; ant 11–12; plate without alignment 4.7.
 - **Holes**: the hole filler after extraction now closes holes up to 64 edges and no longer skips holes near borders, so large models (120 K) stay on the integer-grid path instead of dropping to pairing.
@@ -309,7 +311,7 @@ Tried and not adopted
 - **Experimental**: a smoothed-aggregation multigrid preconditioner (`amg.hpp`) is included but OFF by default because it was slower than the plain Jacobi-CG solver (hand 20 K: 5.7 s vs 3.3 s). Enable with env `FORGE_AMG=1`.
 - Honest limits (unchanged): thin parts below the quad size (ant legs) are ragged; some fans appear at the base of bosses; open borders and density groups still use pairing; 120 K quads takes 40–150 s on 2 cores depending on the model.
 
-## 0.7.0 "Vivaldi" — Integer-grid parametrization: QuadriFlow-grade poles at FORGE speed
+## 0.7.0 — Integer-grid parametrization: QuadriFlow-grade poles at FORGE speed
 - **New quad method inside FORGE**: a seamless integer-grid parametrization replaces the free-floating lattice of 0.6. The cross field is matched between faces, singular vertices are found, a cut graph is built (tree/cotree), a least-squares system makes the (u, v) gradients follow the field with exact seam transitions (rotations of 90° plus translations), and singular vertices and seam translations are rounded to integers step by step. Quads come from the integer iso-lines. Source: `param.hpp`.
 - **Measured** (poles per 1000 quads, lower is better; QuadriFlow in brackets):
 
@@ -326,7 +328,7 @@ Tried and not adopted
 - Checked beyond `t06_extract.py` (which has a sphere, a box, a hemisphere and two spheres): the 120-case sweep with torus (genus 1), bumpy blob, cylinder and box; all closed, manifold, correct Euler characteristic.
 - Honest limits: thin parts below the quad size (ant legs) are still ragged; the hard-surface plate with its marked edges is not yet better; the solver is a plain conjugate gradient, so very large counts take tens of seconds.
 
-## 0.6.0 "Vivaldi" — Global quad lattice: far fewer poles, still fast
+## 0.6.0 — Global quad lattice: far fewer poles, still fast
 - **New quad method in FORGE** (automatic): a global position-field lattice replaces triangle pairing on closed surfaces. Measured at 4000 quads: hand 94 → 40 poles per 1000 quads (96 % regular vertices), 22 at 20 000 quads and 17 at 40 000 quads (6.4 s from 119 K triangles). QuadriFlow: 17 at 4000 quads in ~5 s.
 - Honest limits: the bull ant improves little (103 → 109 is within noise; thin legs are below the quad size) and models with open borders, many marked hard edges (the hard-surface plate) or a density group keep using the 0.5.1 pairing path, because a fixed-spacing grid cannot hold closed border/crease loops exactly.
 - The face count now lands within a few percent of the target (the lattice spacing is corrected up to twice).
@@ -335,7 +337,7 @@ Tried and not adopted
 - Engine statistics report which method ran (`method`). New engine test `t06_extract.py`; the engine tests create their output folder.
 - New experimental `quadopt.hpp` (pole optimisation by chord rotations), off by default.
 
-## 0.5.1 "Vivaldi" — Validated inside Blender, cancel with Esc, packages per platform
+## 0.5.1 — Validated inside Blender, cancel with Esc, packages per platform
 - **Validated in Blender 5.2.2** (through the `bpy` module): all 28 original scenarios and 9 new FORGE scenarios pass, including your three real models (hand, bull ant with peg, hard-surface plate), the operator, density groups, symmetry, levels and the installation of the real extension package.
 - **Cancel with Esc:** the Remesh button now runs a modal operator with a live progress bar. Esc kills the engine process and deletes every temporary datablock; the original is never touched. Scripts can still call the blocking version.
 - **Pole-aware pairing:** after pairing triangles, a simulated-annealing search over alternating cycles reduces irregular vertices (about 10 % fewer poles, ~0.15 s). Honest note: the real limit is the triangle base, so quad quality is still below QuadriFlow (see `docs/STATUS_AND_LIMITS.md` for the measured numbers).
@@ -344,7 +346,7 @@ Tried and not adopted
 - **macOS:** engine binaries for Apple silicon (ad-hoc code signature present) and Intel are included; the add-on clears the quarantine flag when it can. Proper signing and notarization are postponed (see `docs/PUBLISHING.md`).
 - **Developer tools:** `devtools/` (engine tests, comparison against QuadriFlow, STL reader, packager) and `tests/blender_forge_test.py`.
 
-## 0.5.0 "Vivaldi" — Own FORGE engine: quads or triangles (not validated in Blender)
+## 0.5.0 — Own FORGE engine: quads or triangles (not validated in Blender)
 - **New FORGE engine** (dependency-free C++17, separate program in `bin/<system>/`): uses neither QuadriFlow nor anything from Blender. It runs as a separate process, so a failure in it cannot close Blender.
   - Input mesh repair (duplicate faces, flipped normals, pinched vertices, non-manifold).
   - Isotropic remeshing (Botsch–Kobbelt) reprojected onto the original sculpt: no working copy needed.

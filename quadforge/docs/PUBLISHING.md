@@ -2,8 +2,8 @@
 
 ## Packages
 `python devtools/package.py` writes into `dist/`:
-- `quadforge-vivaldi-<version>-all-platforms.zip` — every engine inside; "Install from Disk" on any computer.
-- `quadforge-vivaldi-<version>-<platform>.zip` — one platform each (`windows-x64`, `linux-x64`, `macos-arm64`, `macos-x64`) with a matching `platforms` line in the manifest. This is the shape the Blender Extensions platform expects for extensions that bundle executables.
+- `quadforge-<version>-all-platforms.zip` — every engine inside; "Install from Disk" on any computer.
+- `quadforge-<version>-<platform>.zip` — one platform each (`windows-x64`, `linux-x64`, `macos-arm64`, `macos-x64`) with a matching `platforms` line in the manifest. This is the shape the Blender Extensions platform expects for extensions that bundle executables.
 
 ## Blender Extensions (extensions.blender.org): an open question
 The platform's Terms of Service (checked November 2026) say that the source code of an extension "must be fully written in

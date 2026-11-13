@@ -30,11 +30,11 @@ are surfaces of their own. In Hard Surface mode the remesher can use the result 
 1. Weld, triangulate and run the band detector (`bands.rs`); band triangles are set aside.
 2. **Coplanar patches:** region growing on a plane (normal within 3 degrees, vertices within 0.2 % of the part diagonal), biggest triangles first.
 3. **Surfaces of revolution** about an axis-aligned axis through the middle of the part: patches whose normal has no tangential component
-   and that go round the axis. Radius against height decides cylinder (constant), cone (straight line) or revolution.
+   and that go round the axis. Radius against height decides cylinder (constant), cone (straight line), sphere (all points on one sphere) or revolution.
 4. **Cylinders:** a seed is a pair of neighbouring patches whose shared edge runs along their normals' cross product. Patches are added
    while all vertices stay on one circle (least squares) and the normals stay perpendicular to the axis. Three patches are enough, so a
    14-sided polygonal hole is one cylinder and not 14 planes. Coaxial cylinders that touch merge into one.
-5. **Spheres / free-form** on the remaining smooth patches (four or more).
+5. **Cones, spheres, free-form** on the remaining smooth patches (four or more). A cone is fitted first, from the planes of the facets (they meet at one apex and their normals lie on a small circle); then a sphere (least squares, facets must face away from the centre); otherwise free-form. Neighbouring spheres with the same centre and radius merge.
 6. Coplanar neighbours merge; fragments smaller than 0.05 % of the area join the neighbour they touch the most.
 7. **Borders** between surfaces, classified by their mean angle (>= 25 degrees sharp) or as band.
 
@@ -44,12 +44,12 @@ Prints `SF <json>` and `OK`. The JSON has `surfaces`, `borders`, `bands` and (fi
 ## 4. Known limits
 
 - The revolution search tries the X, Y and Z axes through the bounding-box centre; a turned part with a tilted or off-centre axis is split into several cylinders.
-- Cones that are not about those axes are not detected yet (they stay free-form or planes).
+- Faceted cones, also tilted ones, are detected by their planes; a cone made of very few facets can still be taken for planes.
 - Fillets of many very thin facets and coarse fillets of a few facets are still partly detected (see the detector document).
 - Detection assumes consistent triangle orientation; tolerances are relative to the part size, so a model with tiny details next to a huge body can lose them.
-- Windows and macOS binaries in the repository are older builds without `surfaces`; the CI build adds them.
-- Use Surface Analysis can leave a few triangles (not only quads) where band sides meet other hard edges; compare with it off.
+- The Windows and macOS binaries checked into the repository are older builds without `surfaces`; releases built by CI include them.
+- Use Surface Analysis can leave a few triangles (about 2 % of the faces on real CAD parts, mostly isolated ones); neighbouring triangle pairs are joined into quads when they lie on one smooth patch. Compare with it off.
 
 ## 5. Roadmap
 
-Field alignment to cylinder axes and plane borders, band-width driven row counts, tilted-axis revolutions, cone fitting, per-surface quality report.
+Field alignment to cylinder axes and plane borders, band-width driven row counts, tilted-axis revolutions, removing the isolated triangles, per-surface quality report.

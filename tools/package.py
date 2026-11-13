@@ -67,6 +67,6 @@ if __name__ == "__main__":
     for old in DIST.glob("*.zip"):
         old.unlink()
     v = version()
-    build(f"quadforge-vivaldi-{v}-all-platforms.zip", list(PLATFORMS))
+    build(f"quadforge-{v}-all-platforms.zip", list(PLATFORMS))
     for platform in PLATFORMS:
-        build(f"quadforge-vivaldi-{v}-{platform}.zip", [platform])
+        build(f"quadforge-{v}-{platform}.zip", [platform])

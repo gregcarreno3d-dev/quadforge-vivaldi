@@ -1,19 +1,22 @@
-# QuadForge Vivaldi
+# QuadForge
 
-A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust.
+A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust. Version **0.16.2**.
+It handles organic sculpts and, in preview, CAD / STL parts (3D printing, mechanical): it can split a whole model into surfaces and keep chamfers, bevels and borders.
+
+![CAD parts with QuadForge 0.16.2. Top: surface analysis (planes grey, cylinders green, spheres purple, revolution teal, chamfers orange, bevels blue). Bottom: the Hard Surface remesh of the same parts at about 4K quads, with surface analysis on](docs/images/cad_0.16.jpg)
 
 ![Examples: an organic head at 20K quads, a hard-surface flange at 5K quads with creases kept, and the same flange without hard-edge detection](docs/images/examples.png)
 
-![Results with version 0.11: head, fairy, ant, plate and cylinder, with face counts, poles and hard edges, measured in Blender 5.2.3](docs/images/results_0.11.jpg)
+![Organic and hard-surface results (screenshots from version 0.11, Blender 5.2.3: head, fairy, ant, plate). The method for organic models has not changed since](docs/images/results_0.11.jpg)
 
-Figures in the image come from runs in Blender 5.2.3 on the author's machine; times depend on the computer.
+Screenshots come from runs in Blender 5.2.3 on the author's machine; times depend on the computer.
 
 - Quads or triangles, from 2K to 500K faces, with a one-click **Hard Surface** / **Soft Surface (Organic)** setup
 - Reads heavy sculpts directly, keeps hard edges, symmetry, UV maps, Face Sets and materials
 - Isolate zones by material, Face Set, mask or vertex group
 - Paintable density through a vertex group; smaller faces on thin parts and, optionally, on strongly curved details
 - Quick Preview before the full run, detail per zone, and an option that makes the result match your sculpt after Subdivision Surface
-- **Chamfer and bevel detector (preview, 0.15):** finds and paints the chamfers and bevels of CAD / STL parts; see [below](#chamfer-and-bevel-detector-preview)
+- **Surface analysis, chamfers and bevels (preview, 0.15 / 0.16):** splits a CAD / STL part into planes, cylinders, spheres, cones, revolution surfaces, chamfers and bevels, paints them, and lets the Hard Surface remesh keep their borders; see [below](#surface-analysis-chamfers-and-bevels-preview)
 - Exact symmetry (no open seam), several levels of detail in one run, cancel with Esc
 - English and Spanish interface
 - Blender 4.2 or newer (developed and tested on Blender 5.2). GPL-3.0-or-later.
@@ -81,11 +84,9 @@ GitHub's **Cite this repository** button uses [`CITATION.cff`](CITATION.cff).
 For CAD-style meshes (triangulated STL, mostly 3D printing, millimetres) **Analyze Surfaces** splits the whole model into planes, cylinders, spheres, cones, surfaces of revolution and free-form patches and lists the borders between them; the **Hard Surface** remesh can use it to keep the real limits of every wall (experimental option). The same engine finds the small transition
 faces between big surfaces and tell them apart: **orange = chamfer** (flat), **blue = bevel / fillet** (curved). The
 table of widths, lengths, turn angles and radii is written to a text datablock, and every face gets a `qf_band`
-attribute. Today it is a preview: the remesher does not use it yet; that is the next development step.
+attribute. It is a preview: the *Use Surface Analysis* option of the remesh (on with the **Hard Surface** button) keeps the borders of every surface and both sides of chamfers and bevels wide enough for the quads to follow, so the quad rows follow the real limits of the walls. Compare the result with it on and off; about 2 % of the faces can stay triangles.
 
-![Surfaces found on three test parts with version 0.16: planes grey-blue, cylinders green, surfaces of revolution teal, chamfers orange, bevels blue (illustrative renders of the analysis output)](docs/images/surfaces_0.16.jpg)
-
-![Chamfers (orange) and bevels (blue) detected on four test parts in Blender with version 0.15.3](docs/images/bands_0.15.jpg)
+![Chamfers (orange) and bevels (blue) detected on four test parts in Blender with version 0.15.3 (the surface analysis of 0.16 builds on this detector)](docs/images/bands_0.15.jpg)
 
 Details: [`SURFACE_ANALYSIS.md`](quadforge/docs/SURFACE_ANALYSIS.md) and [`CHAMFER_BEVEL_DETECTOR.md`](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md).
 
@@ -101,7 +102,7 @@ on meshes you can regenerate are in the [technical report](docs/TECHNICAL_REPORT
 
 The FORGE engine is validated most on Linux with Blender 5.2. Engines for Windows and macOS (Intel and Apple Silicon)
 are built by the CI workflow and pass the engine tests there, but have had little real-world use: please open an issue
-if something fails. The chamfer/bevel detector (0.15.x) is currently only in the Linux engine; the other platforms get it with the next CI build.
+if something fails. The chamfer/bevel detector and the surface analysis (0.15.x / 0.16.x) are in the Linux engine checked into the repository; Windows and macOS get them from releases built by CI.
 
 ## Folders
 

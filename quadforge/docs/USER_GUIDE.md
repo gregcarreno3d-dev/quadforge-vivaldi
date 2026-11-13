@@ -1,4 +1,4 @@
-# User guide — QuadForge Vivaldi 0.14.0
+# User guide — QuadForge 0.16.2
 
 ## 1. Basic flow (3 steps)
 1. Select the mesh (triangles or quads, any density). The add-on switches to Object Mode by itself.
@@ -20,7 +20,7 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 - **Flow Guides:** tell the engine where you want the rows of quads to run. In Edit Mode, select edges on your model (for example a loop around an eye or the mouth) and press *Mark Flow Guide*; remesh as usual. It is a soft hint, so it follows your lines where the surface allows it. The minus button unmarks the selected edges, *Clear Flow Guides* removes all of them, and the checkbox in the panel header turns them off without deleting them. With symmetry on the guides are mirrored. FORGE quads only.
 - **Hard Edges:** keeps marked corners as clean edge chains. Lower *Angle* = more edges. *Smart Detection* ignores noise smaller than two quads and keeps right angles. Sharp edges and UV seams can also be respected. *Rounded Bevels* also keeps fillets made of several soft facets (each below the angle) and refines them; turn it off if a smooth organic surface gets unwanted edge rows. *Keep Open Borders* keeps outlines of open meshes.
 - **Surface Analysis (preview, 0.16):** *Analyze Surfaces* splits a CAD mesh into planes, cylinders, spheres, cones, revolution and free-form surfaces and finds the chamfers (orange) and bevels (blue); colours by type or by surface; *Select Faces* by kind and *Select Borders* isolate parts of it; tables in the texts *QuadForge Surfaces* / *QuadForge Bands*. In Hard Edges, *Use Surface Analysis (experimental)* lets the remesh keep the surface borders (the Hard Surface button turns it on). See `SURFACE_ANALYSIS.md`.
-- **Chamfers and Bevels only:** for CAD parts and STL files. Select the mesh and press *Detect Chamfers and Bevels*: chamfers (flat) are painted orange and bevels or fillets (curved) blue. A table with the width, length, turn angle and radius of every band appears in the text *QuadForge Bands*, and each face gets the attribute `qf_band` (0 = none). Sizes are in millimetres. It only analyses: it changes nothing on the mesh and the remesher does not use it yet. Works on the Linux engine for now. Details and limits: `CHAMFER_BEVEL_DETECTOR.md`.
+- **Chamfers and Bevels only:** for CAD parts and STL files. Select the mesh and press *Detect Chamfers and Bevels*: chamfers (flat) are painted orange and bevels or fillets (curved) blue. A table with the width, length, turn angle and radius of every band appears in the text *QuadForge Bands*, and each face gets the attribute `qf_band` (0 = none). Sizes are in millimetres. It only analyses: it changes nothing on the mesh (the remesher uses bands only through *Use Surface Analysis*). Works on the Linux engine for now. Details and limits: `CHAMFER_BEVEL_DETECTOR.md`.
 - **Isolate Zones:** separates by material, Face Set, sculpt mask or vertex group (paint areas in different groups, like ZBrush polygroups) with clean loops.
 - **Symmetry:** local X/Y/Z axes. One half is remeshed, then mirrored and welded. Check *Plane At* if the origin is not centred.
 - **Extra Levels:** `15K, 10K, 5K, 4K` builds several levels in one run (each level is built from the source).
@@ -45,6 +45,6 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 | "The FORGE engine for this system is not inside the add-on" | The executable is missing from `bin/<system>/`; reinstall the zip made for your system (the all-platforms zip has every engine). |
 | macOS blocks the executable | It is an unsigned binary: allow it in Settings > Privacy & Security (or `xattr -d com.apple.quarantine bin/macos-*/forge`). |
 | Count far from the target | Hard edges and zones add constraints: raise the angle or turn zones off. |
-| Many poles in quads | Known limit of 0.5 (see `STATUS_AND_LIMITS.md`). Try Triangles. |
+| Many poles in quads | Known limit (see `STATUS_AND_LIMITS.md`). Try another target count or Triangles. |
 | Slow result | Lower the target faces or use Quick Preview first. |
 | Engine error | The message appears in Blender; Blender does not close. Report the message and the mesh size. |

@@ -93,9 +93,9 @@ jobs:
           version = os.environ["VERSION"]
           m = re.search(r"^## " + re.escape(version) + r".*?\n(.*?)(?=^## |\Z)", text, re.S | re.M)
           body = m.group(1).strip() if m else ""
-          intro = (f"QuadForge Vivaldi {version}\n\n")
+          intro = (f"QuadForge {version}\n\n")
           install = ("\n\nInstall: Edit > Preferences > Get Extensions > Install from Disk, and choose the zip for your system: "
-                     f"quadforge-vivaldi-{version}-windows-x64.zip, -linux-x64.zip, -macos-arm64.zip (Apple Silicon), "
+                     f"quadforge-{version}-windows-x64.zip, -linux-x64.zip, -macos-arm64.zip (Apple Silicon), "
                      "-macos-x64.zip (Intel Mac). The -all-platforms zip works on any of them.\n\n"
                      "Status: validated on Linux. The Windows and macOS engines are built and pass the engine hard cases on "
                      "their own runners, but have had little real-world testing; please open an issue if something fails.\n")
@@ -109,6 +109,6 @@ jobs:
             gh release upload "$TAG" dist/*.zip --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" dist/*.zip --title "QuadForge Vivaldi $VERSION" --notes-file notes.md \
+            gh release create "$TAG" dist/*.zip --title "QuadForge $VERSION" --notes-file notes.md \
               --target "${{ github.sha }}"
           fi

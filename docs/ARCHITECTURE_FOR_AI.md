@@ -1,6 +1,6 @@
-# QuadForge Vivaldi: architecture and behaviour, written for AI assistants
+# QuadForge: architecture and behaviour, written for AI assistants
 
-Version described: **0.16.1** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.16.2** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector since 0.15.1; whole-model surface analysis since 0.16.0). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -182,11 +182,11 @@ Temporary objects: `QuadForge_work`, `QuadForge_proxy`; modifier `QuadForge_Deci
 
 ## 4. Engine internals
 
-The engine is a Rust crate in `engine-rs/` (standard library only; no namespace, one module per stage). It was C++17 until 0.14; the C++ source in `engine/src/` is a frozen reference and has no `bands` command. Work-area map with more detail: `engine-rs/README.md`.
+The engine is a Rust crate in `engine-rs/` (standard library only; no namespace, one module per stage). It was C++17 until 0.14; the C++ source in `engine/src/` is a frozen reference and has no `bands` or `surfaces` command. Work-area map with more detail: `engine-rs/README.md`.
 
 | File (under `engine-rs/src/`) | Role |
 |---|---|
-| `main.rs` | entry: subcommands `remesh`, `repair`, `bands`; `forge bands` runs the detector (section 4.2) |
+| `main.rs` | entry: subcommands `remesh`, `repair`, `bands`, `surfaces`; `forge bands` runs the detector (section 4.3), `forge surfaces` the surface analysis (section 4.2) |
 | `cli.rs` | `remesh` flags and `USAGE` |
 | `pipeline.rs` | the decision flow below (route choice, retries, fallbacks) |
 | `io/fmesh.rs`, `util/protocol.rs` | `.fmesh` I/O, stdout protocol (`P`, `R`, `S`, `B`, `OK`, `ERR`) |
@@ -204,7 +204,7 @@ The engine is a Rust crate in `engine-rs/` (standard library only; no namespace,
 | `stages/quad.rs`, `stages/quadopt.rs` | pairing fallback; chord-rotation pole optimiser (off by default) |
 | `stages/metrics.rs` | statistics JSON |
 | `stages/surfaces.rs` | **whole-model surface segmentation** (`forge surfaces`, plane / cylinder / sphere / cone / revolution / freeform + bands + borders); used by `core/surfaces.py` and, with `use_surface_analysis`, by the hard-edge stage of `core/pipeline.py` |
-| `stages/bands.rs` | **chamfer and bevel detector** (preview, not used by the remesher yet) |
+| `stages/bands.rs` | **chamfer and bevel detector** (used by `surfaces.rs`, which makes bands into surfaces; the remesher uses it only through the surface analysis option) |
 
 ### 4.1 Decision flow in `pipeline.rs`
 

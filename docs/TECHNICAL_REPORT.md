@@ -1,6 +1,6 @@
 # FORGE: field-aligned integer-grid quad remeshing inside Blender
 
-**Technical report for QuadForge Vivaldi 0.15** (engine rewritten in Rust in 0.15.0; the method is unchanged) · GPL-3.0-or-later · November 2026
+**Technical report for QuadForge 0.16** (engine rewritten in Rust in 0.15.0; the method is unchanged) · GPL-3.0-or-later · November 2026
 
 > **What this document is.** A description of how the QuadForge add-on and its FORGE engine turn an arbitrary triangle or
 > polygon mesh into a clean quad mesh. It is a **technical report, not a peer-reviewed paper**. FORGE does not claim a new
@@ -138,7 +138,7 @@ optional density and guide blocks selected by flags). The engine is launched wit
 
 ## 4. Stage B: the FORGE engine (Rust)
 
-Source: `engine-rs/src/` (one module per stage, mapped in `engine-rs/README.md`). The control flow is in `pipeline.rs`. The engine was written in C++17 until 0.14 (`engine/`, kept as a reference); the Rust port produces the same results on the engine test suites. Since 0.15 it also contains a chamfer and bevel detector (`stages/bands.rs`), described in [`CHAMFER_BEVEL_DETECTOR.md`](../quadforge/docs/CHAMFER_BEVEL_DETECTOR.md); the remesher does not use it yet.
+Source: `engine-rs/src/` (one module per stage, mapped in `engine-rs/README.md`). The control flow is in `pipeline.rs`. The engine was written in C++17 until 0.14 (`engine/`, kept as a reference); the Rust port produces the same results on the engine test suites. Since 0.15 it also contains a chamfer and bevel detector (`stages/bands.rs`), described in [`CHAMFER_BEVEL_DETECTOR.md`](../quadforge/docs/CHAMFER_BEVEL_DETECTOR.md); since 0.16 the optional *Use Surface Analysis* hard-edge mode builds on it (whole-model surfaces, [`SURFACE_ANALYSIS.md`](../quadforge/docs/SURFACE_ANALYSIS.md)).
 
 ### 4.1 Repair
 

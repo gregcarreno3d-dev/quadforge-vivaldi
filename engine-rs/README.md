@@ -1,6 +1,6 @@
 # FORGE engine (Rust)
 
-The Rust port of the FORGE engine of QuadForge Vivaldi. Same `.fmesh` files and same stdout protocol
+The Rust port of the FORGE engine of QuadForge. Same `.fmesh` files and same stdout protocol
 (`P` progress, `R` repair report, `S` stats JSON, `OK`/`ERR`) as the former C++ engine in `../engine/` (reference only), so
 the add-on runs any build (`FORGE_ENGINE=/path/to/forge` selects one for development). No dependencies: `cargo build --release`.
 
@@ -51,5 +51,7 @@ Welding them after extraction was tried and rejected: it breaks the closed-mesh 
 ## Chamfer and bevel detector
 
 `forge bands --in part.fmesh [--json out.json] [--sharp 25] [--curved F] [--narrow 0.35] [--max-width W] [--min-width W] [--link 35] [--elong 2]`
+
+`forge surfaces --in part.fmesh [--json out.json] [--sharp 25] [--max-width W] [--min-width W] [--tol 0.002] [--plane-deg 3] [--smooth 50]` splits the whole model into surfaces and borders (prints `SF <json>` and `OK`); see `quadforge/docs/SURFACE_ANALYSIS.md`.
 finds chamfers and bevels (0.15.x preview; the remesher does not use it yet). Debug: `FORGE_BANDS_DEBUG=1`, `FORGE_DBG=1`.
 Full description: `../quadforge/docs/CHAMFER_BEVEL_DETECTOR.md`.

@@ -1,23 +1,23 @@
-# QuadForge Vivaldi — version 0.16.1
+# QuadForge — version 0.16.2
 
 > Entry document for any person or AI receiving this add-on. Read it first; details are in `docs/`.
 
 ## Identity
 | Field | Value |
 |---|---|
-| Name | **QuadForge Vivaldi** (internal extension id: `quadforge`; it does not change, so upgrades keep working) |
-| Version | **0.16.1** (series name: *Vivaldi*) |
+| Name | **QuadForge** (extension id: `quadforge`) |
+| Version | **0.16.2** |
 | Author | GregCarreno3D |
 | License | GPL-3.0-or-later |
 | Requires | Blender 4.2 or newer |
-| Status | Prototype. Validated inside Blender 5.2.2 with automated tests and the author's models; speed is excellent, quad quality (poles) is still below QuadriFlow; see `docs/STATUS_AND_LIMITS.md`. |
+| Status | Prototype. Validated inside Blender 4.2 to 5.2 with automated tests and the author's models. Fast, and better squares than QuadriFlow on most test sculpts; QuadriFlow still has fewer poles at 80K faces and above. CAD / hard-surface support (surface analysis) is in preview. See `docs/STATUS_AND_LIMITS.md`. |
 | Language | The whole project (UI, code, docs) is in English. A Spanish UI translation is optional (`translations.py`). |
 
 ## Versioning scheme
-`MAJOR.MINOR.PATCH` plus a series name. 0.x means prototype. Each MINOR step brings a big capability (0.3 levels and working copy, 0.4 smart hard edges, **0.5 own FORGE engine**; 0.5.x = fixes and polish). The series name (Vivaldi = 0.5.x) identifies a generation. 0.6 brought the lattice method and **0.7 the integer-grid parametrization (far fewer poles)**; the next big engine step is hard-edge alignment (0.8); 1.0 is reserved for a version validated in Blender on all platforms.
+`MAJOR.MINOR.PATCH`. 0.x means prototype. Each MINOR step brings a big capability (0.3 levels and working copy, 0.4 smart hard edges, 0.5 own FORGE engine, 0.7 integer-grid parametrization, 0.10 open borders, 0.15 Rust engine and chamfer/bevel detector, 0.16 whole-model surface analysis); PATCH steps are fixes and polish. 1.0 is reserved for a version validated in Blender on all platforms.
 
 ## What it does, in one sentence
-Turns a mesh (a multi-million-face sculpt or a regular mesh) into a new mesh of **quads or triangles** with a target count, keeping hard edges, open borders, zones and symmetry, using its **own Rust engine (FORGE, C++ until 0.14)** or, optionally, Blender's QuadriFlow.
+Turns a mesh (a multi-million-face sculpt or a regular mesh) into a new mesh of **quads or triangles** with a target count, keeping hard edges, open borders, zones and symmetry, using its **own Rust engine (FORGE)**. For CAD / STL parts it can also analyse the whole model into surfaces (planes, cylinders, spheres, cones, chamfers, bevels) and keep their borders.
 
 ## Where everything is
 ```

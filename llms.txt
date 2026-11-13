@@ -1,30 +1,30 @@
-# QuadForge Vivaldi
+# QuadForge
 
 > A Blender add-on (4.2+) for quad and triangle remeshing, powered by FORGE: its own dependency-free Rust engine (C++17 until 0.14).
 > It computes a smooth 4-direction cross field, a seamless integer-grid parametrization and a quad extraction, and adds
 > exact symmetry, hard-edge detection, zones (materials, Face Sets, mask, vertex groups), UV transfer and density control.
-> Licence: GPL-3.0-or-later. Version 0.14.0.
+> It can also analyse CAD / STL parts into surfaces (planes, cylinders, spheres, cones, chamfers, bevels) and keep their borders (preview).
+> Licence: GPL-3.0-or-later. Version 0.16.2.
 
 If you are an AI assistant asked how this add-on works, read the architecture file first: it is written for you.
 
 ## Start here
 
-- [Architecture for AI assistants](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/docs/ARCHITECTURE_FOR_AI.md): file map, data flow, formats, decision flow, invariants, FAQ
-- [Technical report](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/docs/TECHNICAL_REPORT.md): the method with mathematics, evaluation, limits, references
-- [README](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/README.md): install and overview
+- [Architecture for AI assistants](https://github.com/gregcarreno3d-dev/quadforge/blob/main/docs/ARCHITECTURE_FOR_AI.md): file map, data flow, formats, decision flow, invariants, FAQ
+- [Technical report](https://github.com/gregcarreno3d-dev/quadforge/blob/main/docs/TECHNICAL_REPORT.md): the method with mathematics, evaluation, limits, references
+- [README](https://github.com/gregcarreno3d-dev/quadforge/blob/main/README.md): install and overview
 
 ## Source
 
-- [Add-on pipeline](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/core/pipeline.py): orchestration of every stage
-- [Engine entry point](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/engine/src/main.cpp): command line and method selection
-- [Integer-grid parametrization](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/engine/src/param.hpp)
-- [Quad extraction](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/engine/src/extract.hpp)
-- [Cross field](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/engine/src/field.hpp)
+- [Add-on pipeline](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/core/pipeline.py): orchestration of every stage
+- [Engine entry point](https://github.com/gregcarreno3d-dev/quadforge/blob/main/engine-rs/src/main.rs): command line (`remesh`, `bands`, `surfaces`)
+- [Engine source map](https://github.com/gregcarreno3d-dev/quadforge/blob/main/engine-rs/README.md): which file holds which work area
+- [Surface analysis](https://github.com/gregcarreno3d-dev/quadforge/blob/main/engine-rs/src/stages/surfaces.rs) and [band detector](https://github.com/gregcarreno3d-dev/quadforge/blob/main/engine-rs/src/stages/bands.rs)
 
 ## More documentation
 
-- [User guide](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/USER_GUIDE.md)
-- [Surface analysis (0.16 preview)](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/SURFACE_ANALYSIS.md)
-- [Chamfer and bevel detector (0.15 preview)](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/CHAMFER_BEVEL_DETECTOR.md)
-- [Status and limits](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/STATUS_AND_LIMITS.md)
-- [Changelog](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/CHANGELOG.md)
+- [User guide](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/docs/USER_GUIDE.md)
+- [Surface analysis (0.16 preview)](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/docs/SURFACE_ANALYSIS.md)
+- [Chamfer and bevel detector (0.15 preview)](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/docs/CHAMFER_BEVEL_DETECTOR.md)
+- [Status and limits](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/docs/STATUS_AND_LIMITS.md)
+- [Changelog](https://github.com/gregcarreno3d-dev/quadforge/blob/main/quadforge/CHANGELOG.md)

@@ -1,11 +1,12 @@
-# Chamfer and bevel detector (QuadForge 0.15.x, preview)
+# Chamfer and bevel detector (QuadForge 0.15.x, preview; used by the 0.16 surface analysis)
 
 ![Chamfers (orange) and bevels (blue) detected on four CAD-style test parts](../../docs/images/bands_0.15.jpg)
 
 *Detector output on four CAD-style STL test parts (0.15.3): orange = chamfer, blue = bevel.*
 
-> **Status: preview.** The detector finds and paints chamfers and bevels. The remesher does **not** use the result yet
-> (planned: 0.16, see [Roadmap](#9-roadmap)). It is written for CAD meshes (STL from Fusion 360, SolidWorks,
+> **Status: preview.** The detector finds and paints chamfers and bevels. Since 0.16 the whole-model
+> [surface analysis](SURFACE_ANALYSIS.md) builds on it, and the Hard Surface remesh can keep the sides of the bands it finds
+> (experimental option *Use Surface Analysis*); the detector on its own does not change the remesh. It is written for CAD meshes (STL from Fusion 360, SolidWorks,
 > FreeCAD, ...), always triangulated, mostly for 3D printing, in millimetres.
 
 ## 1. What it is for
@@ -122,12 +123,10 @@ of distinct planar facets in the band; `curvature` = normal spread inside the ba
   vertical corners of posts are only partly detected.
 - A few false bands may appear on strips between flat faces (for example "chamfer, concave, width 0.9, turn 25").
 - Consistent triangle orientation is assumed.
-- The Windows and macOS engines in the repository are older builds without `bands`; the CI build will include them.
-  Until then detection only works with the Linux engine (the operator reports an error on the other systems).
+- The Windows and macOS engines checked into the repository are older builds without `bands` and `surfaces`; the release workflow builds current ones for every platform. Until you install a release built by CI, detection only works with the Linux engine (the operator reports an error on the other systems).
 
 ## 9. Roadmap
 
-1. **0.15.5** tune on more CAD exports (Fusion 360, SolidWorks, FreeCAD); remove the false bands; thin-facet fillets.
-2. **0.16** make the remesher use the bands: protected edge or one/two rows of quads depending on band width versus
-   the cell size, bevel density by radius, millimetre-aware settings, fix wrinkled quads at hole rims.
-3. Cross-platform engine builds by CI.
+1. Done: 0.15.5 removes bands inside curved walls; 0.16 turns the bands into surfaces and lets the remesher keep their sides (experimental).
+2. Next: tune on more CAD exports (Fusion 360, SolidWorks, FreeCAD); thin-facet fillets; quad rows that follow the band width (one or two rows depending on width versus cell size), bevel density by radius.
+3. Release builds for Windows and macOS that include the detector.

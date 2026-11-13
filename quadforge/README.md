@@ -1,43 +1,46 @@
-# QuadForge Vivaldi 0.14.0
+# QuadForge 0.16.2
 
-> The FORGE engine is validated in Blender 5.2 on Linux; the Windows and macOS binaries are built but not yet widely tested.
+A Blender add-on (4.2 or newer, developed on 5.2) that remeshes meshes into clean **quads or triangles**, powered by
+**FORGE**, its own dependency-free engine written in Rust. It reads heavy sculpts directly and also handles CAD / STL
+parts, where it can analyse the whole model into surfaces and keep their real borders.
 
-**New in 0.5:** our own **FORGE** remeshing engine (see `docs/FORGE_ENGINE.md`, `READ_ME_FIRST.md`): outputs **quads or triangles**, reads heavy sculpts without a working copy and supports **paintable density** through a vertex group. QuadriFlow is still available in the *Engine* selector.
+> The engine is validated most on Linux with Blender 5.2. The Windows and macOS binaries are built by CI and pass the
+> engine tests, but have had little real-world use. Surface analysis and chamfer/bevel detection are previews.
 
-Quad remesher for heavy sculpts: you set a target count (and, if you want, a ladder of levels) and get clean, symmetric
-quad meshes that fit your sculpt.
+## What it does
 
-- **Count target** (ZRemesher style): `4000` → roughly 4000 quads.
-- **Level ladder**: `20K` plus `15K, 10K, 5K, 4K` in a single run, each level built from your source.
-- **Multi-million-face sculpts**: FORGE reads dense sculpts directly and projects every level onto your original.
-- **Relaxation** of badly shaped quads, projected back on the surface, without moving corners or the symmetry seam.
-- **Smart hard edges**: analyzes edge chains, ignores noise smaller than two quads, keeps straight corners and
-  snaps the result's corners exactly onto the model's edge lines.
-- **Isolate zones** by materials, Face Sets or mask.
-- **Automatic shading**: smooth with the hard edges marked (Smooth and Flat options).
-- **Two surface buttons** (Hard Surface, Soft Surface / Organic) that configure the add-on and stay marked, and a Target Faces list from 2K to 500K. The 20K to 4K ladder is in Extra Levels.
-- **Exact symmetry** in X, Y, Z: cuts, remeshes one half, mirrors and welds.
-- **Guided interface** (live tips, presets, per-section help) in English and Spanish.
-- **Built-in measurement**: time per stage and Blender's peak memory.
+- **Count target** (ZRemesher style): `4000` gives roughly 4000 quads. Quads or triangles, 2K to 500K faces.
+- **Two surface buttons**: **Hard Surface** (CAD, mechanical parts: hard edges from 30°, right angles, surface analysis on)
+  and **Soft Surface / Organic** (sculpts). They configure the add-on and stay marked.
+- **Smart hard edges**: edge chains, noise smaller than two quads ignored, corners snapped onto the model's edge lines.
+- **Surface analysis (preview, 0.16)**: for CAD meshes it splits the whole model into planes, cylinders, spheres, cones,
+  surfaces of revolution and free-form patches, finds chamfers (orange) and bevels (blue), and lists every border.
+  Hard Surface can keep those borders in the remesh (experimental option).
+- **Exact symmetry** in X, Y, Z: cut, remesh one half, mirror and weld.
+- **Isolate zones** by material, Face Set, mask or vertex group; **paintable density** through a vertex group; detail per zone.
+- **Level ladder** (`20K, 15K, 10K, 5K` in one run), **Quick Preview**, **Subdivision Match**, flow guides.
+- Carries over UV maps, Face Sets, mask and materials. Cancel with Esc.
+- Interface in English and Spanish, with live tips and per-section help.
 
 ## Installation
 
-Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose `quadforge-vivaldi-0.14.0-all-platforms.zip`.
-The panel appears in the 3D Viewport, sidebar (**N** key), **QuadForge** tab.
+Blender 4.2 or later. `Edit > Preferences > Get Extensions > ▾ > Install from Disk…` and choose the zip for your
+system from the **Releases** page (`quadforge-<version>-all-platforms.zip` contains every engine).
+The panel appears in the 3D Viewport sidebar (**N** key), **QuadForge** tab.
 
 ## Usage in 3 steps
 
 1. Select the mesh.
-2. Choose a preset (or type the target quads). The **Ladder 20K to 4K** preset builds the 5 levels.
+2. Press **Hard Surface** or **Soft Surface / Organic**, then pick the target faces.
 3. Press **Remesh**.
 
 The original is kept (hidden). `<name>_quads` appears (or `<name>_quads_20K`, `_15K`, ... with several levels).
-The *How to Use* panel inside the addon explains everything step by step.
+The *How to Use* panel inside the add-on explains everything step by step; see also `docs/USER_GUIDE.md`.
 
 ## How it is organized
 
 ```
-docs/             technical study, decisions, benchmark, open research, references and licenses
+docs/             user guide, architecture, engine, surface analysis, detector, status, studies and decisions
 texts.py          all interface strings (English)
 translations.py   the Spanish translation
 presets.py        one-click starting points
@@ -52,52 +55,31 @@ core/             the "engine room"
   mesh_io.py        fast Blender <-> NumPy transfer
   symmetry.py       cutting, mirroring, seam welding and face orientation
   detail.py         sculpt fitting, corner snapping, polish, face data
+  bands.py          chamfer / bevel detector client (engine command `forge bands`)
+  surfaces.py       whole-model surface analysis client (engine command `forge surfaces`)
   profiling.py      time and memory
-  backends/         engines behind a single interface (today: FORGE)
-  pipeline.py       the 9-stage remeshing recipe (starts at the run() function)
+  backends/         the engine behind a single interface (FORGE)
+  pipeline.py       the remeshing recipe (starts at the run() function)
 tests/            tests and benchmark
 ```
 
 ## How to test it
 
-**1. Check that it works** (inside Blender, from the folder that contains `quadforge`):
+Inside Blender (headless, from the folder that contains `quadforge`), for example:
 
 ```
 blender --factory-startup -b --python quadforge/tests/blender_integration_test.py
+blender --factory-startup -b --python quadforge/tests/blender_surfaces_test.py
 ```
 
-28 scenarios: target, symmetry on 1 and 3 axes, hard edges, materials, working copy with 328 K triangles, fit to the
-original, polish, level ladder, profile and buttons. v0.4 adds 7 that reproduce the defects found in the real
-test: inverted mirrored half, gaps at the seam, collapsed vertices, corner snapping, smart detection,
-shading and 80K/120K presets. Prints `PASS` or `FAIL` with the reason.
+`quadforge/tests/run_in_bpy.py` runs the same files through the `bpy` module. Engine tests: `cargo test --release` in
+`engine-rs/`. The benchmark and its protocol are in `tests/benchmark.py` and `docs/BENCHMARK.md`. The full list of
+commands is in `docs/ARCHITECTURE_FOR_AI.md` (section 8) in the repository.
 
-**2. Measure** (time, memory, detail, symmetry), with your real sculpt:
+## Current status
 
-```
-blender yourfile.blend -b --python quadforge/tests/benchmark.py -- --object ObjectName \
-    --targets 20000,15000,10000,5000,4000 --sym X --out my_sculpt.json
-```
-
-Full protocol and results template in `docs/BENCHMARK.md`.
-
-**3. Without Blender (pure rules, fast):**
-
-```
-python tests/test_geometry.py
-python tests/test_guidance.py
-python tests/test_planning.py
-python tests/test_features.py
-```
-
-## Current status (read this)
-
-- **v0.4 has not been run inside Blender.** Only the syntax and the consistency of texts and translations were checked.
-  The fixes are based on the analysis of the STL files from a real v0.3 test (`docs/CASE_BULL_ANT.md`). Section 10 of `docs/TECHNICAL_STUDY.md` lists the API assumptions that must be confirmed.
-- The engine is the **built-in QuadriFlow**; no guide curves or painted density yet.
-- Remeshing is synchronous: Blender stays busy while it works.
-- It does not yet automate recovery of fine detail (Multires reshape or normal bake); UVs and color attributes
-  are not transferred either.
-- The GPU is not used: this is a reasoned decision in `docs/TECHNICAL_STUDY.md` (section 6).
+See `docs/STATUS_AND_LIMITS.md`. In short: tested on Blender 4.2, 4.5, 5.1 and 5.2 (Linux); fast; better squares than
+QuadriFlow on most test sculpts; remeshing is synchronous (Blender is busy while it works, Esc cancels); the GPU is not used.
 
 ## License
 
