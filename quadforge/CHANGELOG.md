@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.16.2
+- Surface analysis: thin slivers narrower than a band (a ring cut off a revolution wall) and small curved fragments that join a free-form surface smoothly (a fold line across a free-form top) are absorbed by the neighbouring surface; touching free-form patches merge. Found in 0.16.1 test screenshots (Ver-01 top, Ver-03 rim).
 - **Name:** the add-on is now simply **QuadForge** (the series name "Vivaldi" is gone). The extension id stays `quadforge`, so upgrades keep working. Package names are `quadforge-<version>-<platform>.zip`; the repository moves to `gregcarreno3d-dev/quadforge` (GitHub redirects the old address).
 - Documentation brought up to date: new README for the add-on, entry document, user guide, status and limits, surface analysis, detector, architecture and `llms.txt`; new image of the surface analysis and the Hard Surface remesh on CAD parts (`docs/images/cad_0.16.jpg`).
 - Surface analysis: neighbouring spheres with the same centre and radius are merged (a sphere cap was split in two near the pole).

@@ -679,6 +679,71 @@ pub fn analyze(m: &PolyMesh, prm: &SurfParams) -> SurfaceReport {
         }
         for f in 0..nf { if tsurf[f] >= 0 { let mut r = tsurf[f]; while to[r as usize] != r { r = to[r as usize]; } tsurf[f] = r; } }
     }
+    // slivers narrower than a band can be, and small curved fragments that join a free-form surface smoothly,
+    // belong to the surface next to them (a thin ring cut off a revolution wall, a fold line across a free-form top)
+    {
+        let total: f64 = t.area.iter().sum();
+        let min_w = 0.003 * t.diag;
+        let sharp_cos = prm.sharp_deg.to_radians().cos();
+        for _pass in 0..4 {
+            let n = surfaces.len();
+            let mut sa = vec![0.0f64; n];
+            for f in 0..nf { if tsurf[f] >= 0 { sa[tsurf[f] as usize] += t.area[f]; } }
+            let mut share: HashMap<(i32, i32), (f64, f64)> = HashMap::new();
+            let mut perim = vec![0.0f64; n];
+            for f in 0..nf {
+                for i in 0..3 {
+                    let g = t.adj[f][i];
+                    if g < 0 || (g as usize) < f { continue; }
+                    let (a, b) = (tsurf[f], tsurf[g as usize]);
+                    if a < 0 || b < 0 || a == b { continue; }
+                    let tang = if t.nrm[f].dot(t.nrm[g as usize]) >= sharp_cos { t.elen[f][i] } else { 0.0 };
+                    for key in [(a, b), (b, a)] {
+                        let e = share.entry(key).or_insert((0.0, 0.0));
+                        e.0 += t.elen[f][i]; e.1 += tang;
+                    }
+                    perim[a as usize] += t.elen[f][i]; perim[b as usize] += t.elen[f][i];
+                }
+            }
+            let mut to: Vec<i32> = (0..n as i32).collect();
+            let mut changed = false;
+            for s_id in 0..n {
+                let sf = &surfaces[s_id];
+                if sf.band >= 0 || sf.kind == "plane" || sa[s_id] <= 0.0 || perim[s_id] <= 0.0 { continue; }
+                let width = 2.0 * sa[s_id] / perim[s_id];
+                let sliver = width < min_w;
+                let mut tang_total = 0.0;
+                let mut best: Option<(i32, f64)> = None;       // best non-band neighbour by shared length
+                let mut best_ff: Option<(i32, f64)> = None;    // best free-form neighbour by tangent length
+                for (&(a, b), &(len, tang)) in &share {
+                    if a as usize != s_id || surfaces[b as usize].band >= 0 { continue; }
+                    tang_total += tang;
+                    if best.map_or(true, |(_, l)| len > l) { best = Some((b, len)); }
+                    if surfaces[b as usize].kind == "freeform" && best_ff.map_or(true, |(_, l)| tang > l) { best_ff = Some((b, tang)); }
+                }
+                let smooth = sa[s_id] < 0.03 * total && width < 0.01 * t.diag && tang_total >= 0.7 * perim[s_id] && best_ff.is_some();
+                let target = if smooth { best_ff.map(|x| x.0) } else if sliver { best.map(|x| x.0) } else { None };
+                if let Some(tg) = target {
+                    let mut r = tg;
+                    while to[r as usize] != r { r = to[r as usize]; }
+                    if r as usize != s_id { to[s_id] = r; changed = true; }
+                }
+            }
+            // free-form patches that touch smoothly are one free-form surface
+            for (&(a, b), &(_, tang)) in &share {
+                if a >= b { continue; }
+                if surfaces[a as usize].kind != "freeform" || surfaces[b as usize].kind != "freeform" { continue; }
+                if tang >= 0.2 * perim[a as usize].min(perim[b as usize]) {
+                    let (mut ra, mut rb) = (a, b);
+                    while to[ra as usize] != ra { ra = to[ra as usize]; }
+                    while to[rb as usize] != rb { rb = to[rb as usize]; }
+                    if ra != rb { to[ra.max(rb) as usize] = ra.min(rb); changed = true; }
+                }
+            }
+            if !changed { break; }
+            for f in 0..nf { if tsurf[f] >= 0 { let mut r = tsurf[f]; while to[r as usize] != r { r = to[r as usize]; } tsurf[f] = r; } }
+        }
+    }
     // planes: refine centre / normal over all of their triangles
     for (sid, s) in surfaces.iter_mut().enumerate() {
         let mut lo = Vec3::new(f64::MAX, f64::MAX, f64::MAX);
