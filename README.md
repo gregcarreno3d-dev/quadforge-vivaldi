@@ -66,6 +66,7 @@ problem or fall back rather than return an invalid mesh.
 | [**Technical report**](docs/TECHNICAL_REPORT.md) | The method in depth: equations, algorithms, evaluation against Blender's QuadriFlow and Decimate, limitations, how FORGE differs from the published methods, and references |
 | [**Architecture for AI assistants**](docs/ARCHITECTURE_FOR_AI.md) | A dense, exact map of the code for any AI (or contributor) that needs to understand or change it: file map, data flow, formats, decision flow, invariants, tests |
 | [User guide](quadforge/docs/USER_GUIDE.md) | Using the add-on |
+| [Surface analysis](quadforge/docs/SURFACE_ANALYSIS.md) | Whole-model surfaces, borders and how the remesh uses them |
 | [Chamfer and bevel detector](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md) | What the 0.15 detector does, how it works, its command line and limits |
 | [Testing guide](docs/TESTING_GUIDE.md) | A 30-minute checklist for people trying the add-on on their own machine and models |
 | [Status and limits](quadforge/docs/STATUS_AND_LIMITS.md) | What is tested, measured and not done yet |
@@ -75,16 +76,16 @@ This is not a peer-reviewed paper and makes no claim of a new algorithm: it is a
 published ideas ([references in the report](docs/TECHNICAL_REPORT.md#11-references)). If you use it in research,
 GitHub's **Cite this repository** button uses [`CITATION.cff`](CITATION.cff).
 
-## Chamfer and bevel detector (preview)
+## Surface analysis, chamfers and bevels (preview)
 
-For CAD-style meshes (triangulated STL, mostly 3D printing, millimetres) the add-on can find the small transition
+For CAD-style meshes (triangulated STL, mostly 3D printing, millimetres) **Analyze Surfaces** splits the whole model into planes, cylinders, spheres, cones, surfaces of revolution and free-form patches and lists the borders between them; the **Hard Surface** remesh can use it to keep the real limits of every wall (experimental option). The same engine finds the small transition
 faces between big surfaces and tell them apart: **orange = chamfer** (flat), **blue = bevel / fillet** (curved). The
 table of widths, lengths, turn angles and radii is written to a text datablock, and every face gets a `qf_band`
 attribute. Today it is a preview: the remesher does not use it yet; that is the next development step.
 
 ![Chamfers (orange) and bevels (blue) detected on four test parts with version 0.15.3](docs/images/bands_0.15.jpg)
 
-Details, parameters, JSON format and known limits: [`CHAMFER_BEVEL_DETECTOR.md`](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md).
+Details: [`SURFACE_ANALYSIS.md`](quadforge/docs/SURFACE_ANALYSIS.md) and [`CHAMFER_BEVEL_DETECTOR.md`](quadforge/docs/CHAMFER_BEVEL_DETECTOR.md).
 
 ## Measured quality
 

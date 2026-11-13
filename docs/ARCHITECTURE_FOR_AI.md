@@ -1,6 +1,6 @@
 # QuadForge Vivaldi: architecture and behaviour, written for AI assistants
 
-Version described: **0.15.5** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.16.0** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector preview since 0.15.1). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -203,6 +203,7 @@ The engine is a Rust crate in `engine-rs/` (standard library only; no namespace,
 | `stages/quadquality.rs` | raise the worst scaled Jacobian by local vertex moves |
 | `stages/quad.rs`, `stages/quadopt.rs` | pairing fallback; chord-rotation pole optimiser (off by default) |
 | `stages/metrics.rs` | statistics JSON |
+| `stages/surfaces.rs` | **whole-model surface segmentation** (`forge surfaces`, plane / cylinder / sphere / cone / revolution / freeform + bands + borders); used by `core/surfaces.py` and, with `use_surface_analysis`, by the hard-edge stage of `core/pipeline.py` |
 | `stages/bands.rs` | **chamfer and bevel detector** (preview, not used by the remesher yet) |
 
 ### 4.1 Decision flow in `pipeline.rs`
@@ -247,7 +248,11 @@ into cells; neighbouring nodes create edges; dangling cells are pruned; (4) face
 (a quad → 4), relax 15 sweeps (factor 0.6, reproject onto the surface), snap to marked lines within 0.3·rho,
 merge valence-2 dead ends (≤ 6 rounds), `improveQuads(..., 40 sweeps, threshold 0.6)`.
 
-### 4.2 Chamfer and bevel detector (`forge bands`, `stages/bands.rs`)
+### 4.2 Surface analysis (0.16)
+
+See `quadforge/docs/SURFACE_ANALYSIS.md`. `forge surfaces --in X.fmesh [--json OUT]` prints `SF <json>`; python: `core/surfaces.py::analyze_arrays`, operators `quadforge.analyze_surfaces`, `select_borders`, `select_surface_kind`; attributes `qf_surface`, `qf_surface_kind`, `qf_border`. In `core/pipeline.py` (`_mark_hard_edges_and_zones`) `settings.use_surface_analysis` adds sharp borders (and band sides when `surface_band_sides`) to the geometric hard edges; failures only add a warning.
+
+### 4.3 Chamfer and bevel detector (`forge bands`, `stages/bands.rs`)
 
 Full description: `quadforge/docs/CHAMFER_BEVEL_DETECTOR.md`. Summary for code readers:
 

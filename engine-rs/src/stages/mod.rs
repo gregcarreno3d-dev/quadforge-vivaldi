@@ -12,3 +12,4 @@ pub mod quadquality;
 pub mod remesh;
 pub mod repair;
 pub mod sizefield;
+pub mod surfaces;

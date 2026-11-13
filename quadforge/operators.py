@@ -362,6 +362,191 @@ class QUADFORGE_OT_detect_bands(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def apply_surface_colors(mesh, mode: str) -> None:
+    """Paint the faces from the stored attributes: ``qf_surface`` (surface id) and ``qf_surface_kind`` (kind code)."""
+    from .core import surfaces as surf
+    n = len(mesh.polygons)
+    ids = np.zeros(n, dtype=np.int32)
+    kinds = np.zeros(n, dtype=np.int32)
+    mesh.attributes["qf_surface"].data.foreach_get("value", ids)
+    mesh.attributes["qf_surface_kind"].data.foreach_get("value", kinds)
+    if mode == "SURFACE":
+        # one colour per surface: golden-ratio hues, chamfers and bevels stay orange / blue so they are easy to find
+        hue = (ids * 0.61803398875) % 1.0
+        sat = 0.55 + 0.35 * ((ids * 7) % 5) / 4.0
+        val = 0.70 + 0.25 * ((ids * 3) % 4) / 3.0
+        h6 = hue * 6.0
+        i6 = np.floor(h6).astype(int) % 6
+        f6 = h6 - np.floor(h6)
+        p_, q_, t_ = val * (1 - sat), val * (1 - sat * f6), val * (1 - sat * (1 - f6))
+        r = np.choose(i6, [val, q_, p_, p_, t_, val])
+        g = np.choose(i6, [t_, val, val, q_, p_, p_])
+        b = np.choose(i6, [p_, p_, t_, val, val, q_])
+        colors = np.stack([r, g, b, np.ones(n)], axis=1).astype(np.float32)
+        for code in (7, 8):
+            colors[kinds == code] = surf.KIND_COLORS[code]
+        colors[ids < 0] = surf.KIND_COLORS[0]
+    else:
+        table = np.array([surf.KIND_COLORS[k] for k in range(max(surf.KIND_COLORS) + 1)], dtype=np.float32)
+        colors = table[np.clip(kinds, 0, len(table) - 1)]
+    totals = np.empty(n, dtype=np.int32)
+    mesh.polygons.foreach_get("loop_total", totals)
+    per_loop = colors[np.repeat(np.arange(n), totals)]
+    name = "QuadForge Surfaces"
+    attribute = mesh.color_attributes.get(name) or mesh.color_attributes.new(name, "FLOAT_COLOR", "CORNER")
+    attribute.data.foreach_set("color", per_loop.reshape(-1))
+    mesh.color_attributes.active_color = attribute
+    mesh.color_attributes.render_color_index = list(mesh.color_attributes).index(attribute)
+    mesh.update()
+
+
+class QUADFORGE_OT_analyze_surfaces(bpy.types.Operator):
+    """Split the whole model into surfaces (planes, cylinders, spheres, cones, revolution, free-form) plus its chamfers and
+bevels, and list the borders between them"""
+    bl_idname = "quadforge.analyze_surfaces"
+    bl_label = "Analyze Surfaces"
+    bl_options = {"REGISTER", "UNDO"}
+
+    max_width_mm: bpy.props.FloatProperty(
+        name="Widest Band (mm)", default=0.0, min=0.0, soft_max=50.0,
+        description="Widest chamfer or bevel to look for, in millimetres. 0 = automatic (4% of the part size)")
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH"
+
+    def execute(self, context):
+        from .core import bands as bands_core, geometry as geo, mesh_io as mio_, surfaces as surf
+        obj = context.active_object
+        mesh = obj.data
+        if obj.mode == "EDIT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        dims = obj.dimensions
+        mm_per_unit, how = bands_core.guess_mm_per_unit(context.scene, max(dims.x, dims.y, dims.z))
+        width_units = self.max_width_mm / mm_per_unit if self.max_width_mm > 0 else 0.0
+        try:
+            face_surface, report = surf.analyze(obj, width_units)
+        except Exception as error:   # noqa: BLE001 - shown to the person
+            self.report({"ERROR"}, f"Surface analysis failed: {error}")
+            return {"CANCELLED"}
+        surfaces = report["surfaces"]
+        arrays = mio_.read_mesh_arrays(mesh)
+        mio_.write_int_face_attribute(mesh, "qf_surface", face_surface)
+        mio_.write_int_face_attribute(mesh, "qf_surface_kind", surf.face_kind_codes(face_surface, surfaces))
+        band_of_surface = np.array([s["band"] + 1 for s in surfaces] + [0], dtype=np.int32)   # last = "no surface" (-1 indexes it)
+        mio_.write_int_face_attribute(mesh, "qf_band", band_of_surface[face_surface])
+        codes = surf.border_edge_codes(arrays, face_surface, report["borders"])
+        attribute = mesh.attributes.get("qf_border")
+        if attribute is None or attribute.domain != "EDGE" or attribute.data_type != "INT":
+            if attribute is not None:
+                mesh.attributes.remove(attribute)
+            attribute = mesh.attributes.new(name="qf_border", type="INT", domain="EDGE")
+        attribute.data.foreach_set("value", codes)
+        apply_surface_colors(mesh, context.scene.quadforge.surface_view)
+        for area in context.screen.areas:
+            if area.type == "VIEW_3D":
+                area.spaces[0].shading.type = "SOLID"
+                area.spaces[0].shading.color_type = "VERTEX"
+        # text report
+        k2 = mm_per_unit
+        kinds = {}
+        for s_ in surfaces:
+            kinds[s_["kind"]] = kinds.get(s_["kind"], 0) + 1
+        bkinds = {}
+        for b in report["borders"]:
+            bkinds[b["kind"]] = bkinds.get(b["kind"], 0) + 1
+        lines = [f"Part size: {dims.x * k2:.2f} x {dims.y * k2:.2f} x {dims.z * k2:.2f} mm  ({how})",
+                 "Surfaces: " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda kv: -kv[1])),
+                 "Borders:  " + ", ".join(f"{n} {k}" for k, n in sorted(bkinds.items(), key=lambda kv: -kv[1])), "",
+                 "SURFACES (area in mm2; radius / sweep for round ones; err = worst fit error as % of the part size)",
+                 "  id  kind        area_mm2   radius_mm  sweep  patches  tris   err%   axis"]
+        for i, s_ in enumerate(surfaces[:300]):
+            axis = s_["axis"]
+            ax = f"({axis[0]:.2f},{axis[1]:.2f},{axis[2]:.2f})" if any(abs(v) > 1e-9 for v in axis) else ""
+            rad = f"{s_['radius'] * k2:9.2f}" if s_["radius"] > 0 else "        -"
+            sw = f"{s_['sweep']:5.0f}" if s_["kind"] in ("cylinder", "cone") else "    -"
+            lines.append(f"{i:4d}  {s_['kind']:<11} {s_['area'] * k2 * k2:10.1f} {rad} {sw}  {s_['patches']:7d} {s_['triangles']:5d} {100 * s_['err']:6.3f}  {ax}")
+        lines += ["", "BORDERS (between two surfaces)", "  from  to   kind      length_mm  angle"]
+        for b in sorted(report["borders"], key=lambda b: -b["length"])[:300]:
+            lines.append(f"{b['a']:6d} {b['b']:4d}  {b['kind']:<8} {b['length'] * k2:10.2f} {b['angle']:6.1f}")
+        text = bpy.data.texts.get("QuadForge Surfaces") or bpy.data.texts.new("QuadForge Surfaces")
+        text.clear()
+        text.write("\n".join(lines))
+        self.report({"INFO"}, f"{len(surfaces)} surfaces ({', '.join(f'{n} {k}' for k, n in sorted(kinds.items(), key=lambda kv: -kv[1])[:4])}). "
+                              f"Details in the text 'QuadForge Surfaces'.")
+        return {"FINISHED"}
+
+
+class QUADFORGE_OT_select_borders(bpy.types.Operator):
+    """Select the edges that separate two surfaces (run Analyze Surfaces first)"""
+    bl_idname = "quadforge.select_borders"
+    bl_label = "Select Borders"
+    bl_options = {"REGISTER", "UNDO"}
+
+    kind: bpy.props.EnumProperty(
+        name="Kind", default="ALL",
+        items=(("ALL", "All", "Every border"), ("SHARP", "Sharp", "Corners between surfaces"),
+               ("TANGENT", "Tangent", "Smooth joins between surfaces"), ("BAND", "Chamfer / Bevel sides", "Edges along both sides of chamfers and bevels")))
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH" and active.data.attributes.get("qf_border") is not None
+
+    def execute(self, context):
+        obj = context.active_object
+        mesh = obj.data
+        if obj.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        codes = np.zeros(len(mesh.edges), dtype=np.int32)
+        mesh.attributes["qf_border"].data.foreach_get("value", codes)
+        wanted = {"ALL": (1, 2, 3), "SHARP": (1,), "TANGENT": (2,), "BAND": (3,)}[self.kind]
+        mask = np.isin(codes, wanted)
+        mesh.vertices.foreach_set("select", np.zeros(len(mesh.vertices), dtype=bool))
+        mesh.edges.foreach_set("select", mask)
+        mesh.polygons.foreach_set("select", np.zeros(len(mesh.polygons), dtype=bool))
+        edge_verts = np.empty(len(mesh.edges) * 2, dtype=np.int32)
+        mesh.edges.foreach_get("vertices", edge_verts)
+        sel = np.zeros(len(mesh.vertices), dtype=bool)
+        sel[edge_verts.reshape(-1, 2)[mask].reshape(-1)] = True
+        mesh.vertices.foreach_set("select", sel)
+        mesh.update()
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_mode(type="EDGE")
+        self.report({"INFO"}, f"{int(mask.sum())} border edges selected.")
+        return {"FINISHED"}
+
+
+class QUADFORGE_OT_select_surface_kind(bpy.types.Operator):
+    """Select all faces of one kind of surface (run Analyze Surfaces first), for example every chamfer or every cylinder"""
+    bl_idname = "quadforge.select_surface_kind"
+    bl_label = "Select Faces"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        active = context.active_object
+        return active is not None and active.type == "MESH" and active.data.attributes.get("qf_surface_kind") is not None
+
+    def execute(self, context):
+        from .core import surfaces as surf
+        obj = context.active_object
+        mesh = obj.data
+        kind = context.scene.quadforge.surface_select_kind
+        if obj.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        codes = np.zeros(len(mesh.polygons), dtype=np.int32)
+        mesh.attributes["qf_surface_kind"].data.foreach_get("value", codes)
+        mask = codes == surf.KIND_CODES[kind]
+        mesh.polygons.foreach_set("select", mask)
+        mesh.update()
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_mode(type="FACE")
+        self.report({"INFO"}, f"{int(mask.sum())} faces of kind '{kind}' selected.")
+        return {"FINISHED"}
+
+
 def guide_edge_count(obj) -> int:
     """How many edges of ``obj`` are marked as flow guides (works in Edit Mode too)."""
     if obj is None or obj.type != "MESH":

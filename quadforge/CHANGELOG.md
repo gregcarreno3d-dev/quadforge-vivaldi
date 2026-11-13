@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0
+- **Surface analysis (preview).** New engine command `forge surfaces` and panel *Surface Analysis*: the whole model is split into surfaces (plane, cylinder, sphere, cone, revolution, free-form, chamfer, bevel) with borders between them (sharp, tangent, band). Coarse polygonal cylinders are recognised as one cylinder; spool-like walls as one surface of revolution.
+- Blender: *Analyze Surfaces*, colours by type or by surface, *Select Faces* by kind, *Select Borders* by kind, text table *QuadForge Surfaces*, attributes `qf_surface`, `qf_surface_kind`, `qf_border`.
+- **Hard Edges > Use Surface Analysis (experimental):** the remesh keeps surface borders and, optionally, both sides of every chamfer and bevel as hard edges. The Hard Surface button turns it on, Organic off.
+- Tests: new engine unit test and `blender_surfaces_test.py`.
+
 ## 0.15.5
 - Chamfer and bevel detector: a flat or a ridge cut into a cylinder wall (for example a D-shaped flat inside a hole) is no longer reported as a chamfer. A band is now rejected when both of its flanks are curved about the same axis as the band itself, which means they are one wall and not two surfaces.
 - Debug output (`FORGE_BANDS_DEBUG=1`) also lists the accepted bands with their measurements.

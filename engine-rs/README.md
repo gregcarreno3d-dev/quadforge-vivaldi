@@ -23,6 +23,7 @@ the add-on runs any build (`FORGE_ENGINE=/path/to/forge` selects one for develop
 | all-quad cleanup (thin strips, dead ends, stars)       | `src/stages/extract/finish.rs`           |
 | quad quality polish                                    | `src/stages/quadquality.rs`              |
 | metrics JSON                                           | `src/stages/metrics.rs`                  |
+| whole-model surface segmentation (`forge surfaces`)    | `src/stages/surfaces.rs`                 |
 | chamfer / bevel detector (`forge bands`)               | `src/stages/bands.rs`, flags in `src/main.rs` |
 
 ## Status

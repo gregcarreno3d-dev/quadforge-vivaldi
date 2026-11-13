@@ -15,6 +15,17 @@ def _unmark_surface(self, _context):
         self.surface_type = "NONE"
 
 
+def _recolor_surfaces(context):
+    """Repaint the active mesh from its stored surface attributes when the colour mode changes."""
+    try:
+        from .operators import apply_surface_colors
+        obj = context.active_object
+        if obj is not None and obj.type == "MESH" and obj.data.attributes.get("qf_surface") is not None and obj.mode == "OBJECT":
+            apply_surface_colors(obj.data, context.scene.quadforge.surface_view)
+    except Exception:   # noqa: BLE001 - a colour refresh must never break the UI
+        pass
+
+
 def apply_surface_profile(settings, key: str) -> bool:
     """Write the values of a surface profile into ``settings`` and mark its button. Returns False for an unknown key."""
     global _applying_profile
@@ -151,6 +162,35 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         description="Keep the profile of rounded bevels and thin chamfer strips: the quad rows follow both sides of them "
                     "and the faces get smaller there. Turn off if a smooth surface gets too many small faces",
         default=True,
+    )
+    use_surface_analysis: BoolProperty(
+        name="Use Surface Analysis (experimental)",
+        description="Analyse the whole model first (planes, cylinders, spheres, chamfers, bevels) and keep the borders "
+                    "between surfaces and both sides of every chamfer or bevel as hard edges. Made for CAD and hard "
+                    "surface models; the Hard Surface button turns it on",
+        default=False,
+    )
+    surface_band_sides: BoolProperty(
+        name="Keep Chamfer / Bevel Sides",
+        description="With Use Surface Analysis: also keep the two long sides of every chamfer and bevel as hard edges. "
+                    "Turn it off to keep only the borders between surfaces (fewer constraints, fewer triangles)",
+        default=True,
+    )
+    surface_view: EnumProperty(
+        name="Colours",
+        description="How Analyze Surfaces paints the model",
+        items=(("SURFACE", "By Surface", "One colour per surface: every wall of the part is a different colour"),
+               ("TYPE", "By Type", "Colour by kind: plane, cylinder, sphere, cone, revolution, free-form, chamfer (orange), bevel (blue)")),
+        default="TYPE",
+        update=lambda self, context: _recolor_surfaces(context),
+    )
+    surface_select_kind: EnumProperty(
+        name="Kind",
+        description="Kind of surface to select",
+        items=(("plane", "Planes", ""), ("cylinder", "Cylinders", ""), ("sphere", "Spheres", ""), ("cone", "Cones", ""),
+               ("revolution", "Revolution", "Surfaces of revolution such as the wall of a spool"),
+               ("freeform", "Free-form", ""), ("chamfer", "Chamfers", ""), ("bevel", "Bevels", "")),
+        default="chamfer",
     )
     use_seams: BoolProperty(
         name="UV Seams",
@@ -309,6 +349,8 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
             sharp_angle_deg=math.degrees(self.sharp_angle),
             use_existing_sharp=self.use_existing_sharp,
             soft_bevels=self.soft_bevels,
+            use_surface_analysis=self.use_surface_analysis,
+            surface_band_sides=self.surface_band_sides,
             use_seams=self.use_seams,
             smart_features=self.smart_features,
             min_feature_size=self.min_feature_size,

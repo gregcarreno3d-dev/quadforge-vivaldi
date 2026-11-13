@@ -64,6 +64,37 @@ fn main() {
         }
         return;
     }
+    // Whole-model surface segmentation: forge surfaces --in FILE [--json OUT] [bands flags]
+    if args.len() >= 2 && args[1] == "surfaces" {
+        let mut prm = stages::surfaces::SurfParams::default();
+        let (mut input, mut json) = (String::new(), String::new());
+        let mut i = 2;
+        while i < args.len() {
+            let v = args.get(i + 1).cloned().unwrap_or_default();
+            match args[i].as_str() {
+                "--in" => input = v,
+                "--json" => json = v,
+                "--sharp" => { let d = v.parse().unwrap_or(prm.bands.sharp_deg); prm.bands.sharp_deg = d; }
+                "--max-width" => prm.bands.max_width = v.parse().unwrap_or(0.0),
+                "--min-width" => prm.bands.min_width = v.parse().unwrap_or(0.0),
+                "--tol" => prm.tol_rel = v.parse().unwrap_or(prm.tol_rel),
+                "--plane-deg" => prm.plane_deg = v.parse().unwrap_or(prm.plane_deg),
+                "--smooth" => prm.smooth_deg = v.parse().unwrap_or(prm.smooth_deg),
+                _ => { i += 1; continue; }
+            }
+            i += 2;
+        }
+        match io::fmesh::read(&input) {
+            Ok(m) => {
+                let rep = stages::surfaces::analyze(&m, &prm);
+                if !json.is_empty() { let _ = std::fs::write(&json, rep.to_json(true)); }
+                say("SF", &rep.to_json(false));
+                say("OK", "");
+            }
+            Err(e) => { say("ERR", &e); std::process::exit(2); }
+        }
+        return;
+    }
     if args.len() >= 2 && args[1] == "remesh" {
         std::process::exit(cli::run_remesh(&args));
     }

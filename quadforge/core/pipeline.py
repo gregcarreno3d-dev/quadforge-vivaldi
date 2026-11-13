@@ -95,6 +95,8 @@ class RemeshSettings:
     sharp_angle_deg: float = 35.0
     use_existing_sharp: bool = True
     soft_bevels: bool = True                 # keep the rows along rounded bevels made of shallow facets
+    surface_band_sides: bool = True          # with the analysis: keep both sides of every chamfer / bevel as hard edges
+    use_surface_analysis: bool = False       # experimental: surface borders and chamfer/bevel sides become hard edges (CAD meshes)
     relax_quads: bool = True         # even out badly shaped quads and put them back on the surface
     soft_bevel_detail: float = 0.5           # edge length multiplier on the facets of rounded bevels (1 = no refinement)
     use_seams: bool = True
@@ -570,6 +572,20 @@ def _mark_hard_edges_and_zones(mesh, settings: RemeshSettings, quads_for_piece: 
         soft, soft_band = features.detect_soft_bevels(arrays, settings.sharp_angle_deg, quad_length, normals=normals,
                                                  areas=areas, band_vertices=True)
         geometric |= soft
+    if settings.use_surface_analysis:
+        try:
+            from . import surfaces as surf
+            sizes = np.diff(arrays.poly_offsets).astype(np.int32)
+            face_surface, report = surf.analyze_arrays(arrays.co, sizes, arrays.loop_verts.astype(np.int32))
+            codes = surf.border_edge_codes(arrays, face_surface, report["borders"])
+            border = codes == surf.BORDER_CODES["sharp"]
+            if settings.surface_band_sides:
+                border |= codes == surf.BORDER_CODES["band"]
+            geometric |= border
+        except Exception as error:   # noqa: BLE001 - the remesh must still run without the analysis
+            message = f"Surface analysis was skipped: {error}"
+            if message not in warnings:
+                warnings.append(message)
     hard |= geometric
     guide_lines = 0
     planes = np.zeros(arrays.n_edges, dtype=bool)

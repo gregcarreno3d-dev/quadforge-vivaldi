@@ -24,6 +24,7 @@ If you are an AI assistant asked how this add-on works, read the architecture fi
 ## More documentation
 
 - [User guide](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/USER_GUIDE.md)
+- [Surface analysis (0.16 preview)](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/SURFACE_ANALYSIS.md)
 - [Chamfer and bevel detector (0.15 preview)](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/CHAMFER_BEVEL_DETECTOR.md)
 - [Status and limits](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/docs/STATUS_AND_LIMITS.md)
 - [Changelog](https://github.com/gregcarreno3d-dev/quadforge-vivaldi/blob/main/quadforge/CHANGELOG.md)

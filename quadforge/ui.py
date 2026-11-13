@@ -196,16 +196,29 @@ class QUADFORGE_PT_main(_QuadForgePanel, bpy.types.Panel):
 # --------------------------------------------------------------------------- optional sections
 
 class QUADFORGE_PT_bands(_QuadForgePanel, bpy.types.Panel):
-    bl_label = "Chamfers and Bevels (preview)"
+    bl_label = "Surface Analysis (preview)"
     bl_parent_id = "QUADFORGE_PT_main"
     bl_options = {"DEFAULT_CLOSED"}
 
     def draw(self, context):
         layout = self.layout
         _prepare_layout(layout)
-        draw_wrapped_text(layout, context, "Finds the chamfers and bevels of a CAD-style mesh (STL) and paints them: orange = chamfer, blue = bevel. "
-                                           "Sizes are read in millimetres. Preview of the detector; remeshing does not use it yet.")
-        layout.operator("quadforge.detect_bands", icon="MOD_BEVEL")
+        settings = context.scene.quadforge
+        draw_wrapped_text(layout, context, "For CAD-style meshes (STL). Splits the whole model into surfaces (planes, cylinders, spheres, cones, "
+                                           "revolution, free-form) and finds its chamfers (orange) and bevels (blue). Sizes are read in millimetres.")
+        layout.operator("quadforge.analyze_surfaces", icon="MESH_DATA")
+        layout.prop(settings, "surface_view", expand=True)
+        box = layout.box()
+        box.label(text="Isolate")
+        row = box.row(align=True)
+        row.prop(settings, "surface_select_kind", text="")
+        row.operator("quadforge.select_surface_kind", text="Select Faces")
+        row = box.row(align=True)
+        for key, label in (("ALL", "All Borders"), ("SHARP", "Sharp"), ("TANGENT", "Tangent"), ("BAND", "Bevel Sides")):
+            row.operator("quadforge.select_borders", text=label).kind = key
+        layout.operator("quadforge.detect_bands", text="Chamfers and Bevels Only", icon="MOD_BEVEL")
+        draw_wrapped_text(layout, context, "Tables: Text Editor > 'QuadForge Surfaces' and 'QuadForge Bands'. In Hard Surface the remesh can use this "
+                                           "analysis: see Hard Edges > Use Surface Analysis.")
 
 
 class QUADFORGE_PT_hard_edges(_QuadForgePanel, bpy.types.Panel):
@@ -234,6 +247,10 @@ class QUADFORGE_PT_hard_edges(_QuadForgePanel, bpy.types.Panel):
         draw_wrapped_text(detection, context, translate(texts.HELP_SMART_FEATURES))
         detection.prop(settings, "soft_bevels")
         layout.separator()
+        layout.prop(settings, "use_surface_analysis")
+        sides = layout.column()
+        sides.active = settings.use_surface_analysis
+        sides.prop(settings, "surface_band_sides")
         layout.prop(settings, "use_existing_sharp")
         layout.prop(settings, "use_seams")
         layout.prop(settings, "preserve_boundary")

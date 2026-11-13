@@ -1,4 +1,4 @@
-# QuadForge Vivaldi — version 0.15.5
+# QuadForge Vivaldi — version 0.16.0
 
 > Entry document for any person or AI receiving this add-on. Read it first; details are in `docs/`.
 
@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Name | **QuadForge Vivaldi** (internal extension id: `quadforge`; it does not change, so upgrades keep working) |
-| Version | **0.15.5** (series name: *Vivaldi*) |
+| Version | **0.16.0** (series name: *Vivaldi*) |
 | Author | GregCarreno3D |
 | License | GPL-3.0-or-later |
 | Requires | Blender 4.2 or newer |
@@ -29,6 +29,7 @@ ui.py                   sidebar panels (N > QuadForge)
 guidance.py planning.py presets.py texts.py translations.py   live advice, pure rules, presets, English texts, optional Spanish
 core/pipeline.py        the full remesh recipe (stages 1-9)
 core/bands.py           chamfer / bevel detector client (preview, 0.15+)
+core/surfaces.py        whole-model surface analysis client (preview, 0.16+)
 core/backends/          engines: forge.py (own engine)
 core/forge_io.py        .fmesh format (exchange with the engine)
 core/mesh_io.py geometry.py symmetry.py features.py detail.py profiling.py   NumPy/Blender utilities
@@ -43,6 +44,7 @@ tests/                  tests (no Blender needed except blender_integration_test
 - `docs/USER_GUIDE.md` — step-by-step guide for the artist: every option, when to use it, common problems.
 - `docs/ARCHITECTURE.md` — how it works inside (add-on, pipeline, protocol, format, engine algorithms). For developers and AIs.
 - `docs/FORGE_ENGINE.md` — engine summary.
+- `docs/SURFACE_ANALYSIS.md` — whole-model surface analysis (0.16 preview) and its use in Hard Surface.
 - `docs/CHAMFER_BEVEL_DETECTOR.md` — the chamfer and bevel detector (0.15 preview): what it does, how it works, command line, JSON, limits, roadmap.
 - `docs/STATUS_AND_LIMITS.md` — what is tested, what is not, and the roadmap.
 - `docs/PUBLISHING.md` — packages, Blender Extensions and Superhive notes, macOS signing (postponed).
