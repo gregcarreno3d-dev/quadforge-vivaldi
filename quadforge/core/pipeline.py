@@ -915,6 +915,28 @@ def _dissolve_seam_corners(bm, plan: sym.SymmetryPlan) -> int:
     return merged_count
 
 
+def _join_leftover_triangles(mesh, face_angle_degrees: float = 20.0, shape_angle_degrees: float = 60.0) -> int:
+    """Joins neighbouring triangles into quads where the two lie on one smooth patch (never across a sharp turn).
+
+    Returns how many triangles were removed.
+    """
+    import math
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        tris = [face for face in bm.faces if len(face.verts) == 3]
+        if not tris:
+            return 0
+        bmesh.ops.join_triangles(bm, faces=tris, angle_face_threshold=math.radians(face_angle_degrees),
+                                 angle_shape_threshold=math.radians(shape_angle_degrees))
+        left = sum(1 for face in bm.faces if len(face.verts) == 3)
+        bm.to_mesh(mesh)
+        mesh.update()
+        return len(tris) - left
+    finally:
+        bm.free()
+
+
 def _mirror_halves_into_final_mesh(half_mesh, plan: sym.SymmetryPlan, input_was_closed: bool,
                                    original, mesh_name: str, settings: RemeshSettings) -> bpy.types.Mesh:
     bm = bmesh.new()
@@ -1135,6 +1157,9 @@ def run_steps(context, original, settings: RemeshSettings,
             if settings.relax_quads and settings.output == "QUADS" and source.surface_tree is not None:
                 with profiler.stage(f"Level {label}: relax bad quads"):
                     detail.relax_bad_quads(half_mesh, source.surface_tree, snap_angle, RELAX_PASSES)
+            if settings.use_surface_analysis and settings.output == "QUADS":
+                with profiler.stage(f"Level {label}: join leftover triangles"):
+                    _join_leftover_triangles(half_mesh)
             finished_halves.append((target, half_mesh, constraints.hard_edge_count,
                                     time.perf_counter() - level_started))
 

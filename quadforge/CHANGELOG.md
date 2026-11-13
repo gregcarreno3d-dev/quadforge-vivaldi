@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.16.2
+- With Use Surface Analysis the result's neighbouring triangle pairs are joined into quads when they lie on one smooth patch. Most leftover triangles (about 2 % of faces on real CAD parts) are isolated singular ones, which this cannot remove; they are still on the list.
 - Surface analysis: cones are now fitted directly from the planes of faceted frustums (also tilted ones), true spheres are no longer taken for surfaces of revolution, and a stricter revolution test avoids mislabelling cones and spheres.
 - Engine unit tests for cylinder, frustum, tilted frustum and sphere.
 
