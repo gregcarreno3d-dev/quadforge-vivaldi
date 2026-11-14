@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.16.4
 - Surface analysis: a chamfer triangle that meets a plain surface almost tangentially (under 6°) goes back to that surface. Fixes the small orange rectangle that a seam of the STL left on the wall of Ver-03.
 
 ## 0.16.3

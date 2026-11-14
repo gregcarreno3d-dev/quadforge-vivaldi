@@ -1,6 +1,6 @@
-# Status and limits — QuadForge 0.16.3
+# Status and limits — QuadForge 0.16.4
 
-## Current status (0.16.3)
+## Current status (0.16.4)
 - **Surface analysis and chamfer/bevel detection (preview).** Tested on real CAD parts (a cylinder plate, a perforated plate, a flange, a spool-like part) and on synthetic parts (prisms, frustums, a tilted frustum, a UV sphere, a bracket with a tilted hole, a six-hole flange, a dome, a cone on a cylinder, an off-centre boss). Unit tests live in `engine-rs/src/stages/surfaces.rs`; the Blender test is `tests/blender_surfaces_test.py`.
 - **Known limits of the analysis:** surfaces of revolution are searched only about the X, Y and Z axes through the centre of the model; fillets made of very thin facets and coarse 3-facet fillets are only partly detected; with *Use Surface Analysis* about 2 % of the faces can stay triangles (isolated ones in the quad flow); the detector is in the Linux engine checked into the repository, and in Windows / macOS builds made by CI.
 - **Speed on CAD parts:** a plate with a strong size variation falls back after the second attempt (about 12 s instead of 26 s at 4K quads).

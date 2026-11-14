@@ -1,6 +1,6 @@
 # QuadForge
 
-A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust. Version **0.16.3**.
+A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust. Version **0.16.4**.
 It handles organic sculpts and, in preview, CAD / STL parts (3D printing, mechanical): it can split a whole model into surfaces and keep chamfers, bevels and borders.
 
 ![CAD parts with QuadForge 0.16.3. Top: surface analysis (planes grey, cylinders green, spheres purple, revolution teal, chamfers orange, bevels blue). Bottom: the Hard Surface remesh of the same parts at about 4K quads, with surface analysis on](docs/images/cad_0.16.jpg)

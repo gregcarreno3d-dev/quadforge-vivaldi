@@ -1,4 +1,4 @@
-# Testing guide for QuadForge 0.16.3
+# Testing guide for QuadForge 0.16.4
 
 Thank you for testing. The engine passes its automated tests on Linux, Windows and macOS in continuous integration, and the
 add-on was run on Blender 4.2, 4.5, 5.1 and 5.2 on Linux. What has **not** had real use is Windows and macOS on real

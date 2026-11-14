@@ -1,4 +1,4 @@
-# QuadForge 0.16.3
+# QuadForge 0.16.4
 
 A Blender add-on (4.2 or newer, developed on 5.2) that remeshes meshes into clean **quads or triangles**, powered by
 **FORGE**, its own dependency-free engine written in Rust. It reads heavy sculpts directly and also handles CAD / STL
