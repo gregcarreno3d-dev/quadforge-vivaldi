@@ -95,6 +95,21 @@ Open borders: the engine closes every border loop with a cap, treats the loop as
 - Symmetry with FORGE quads on closed models: the whole model is remeshed with the planes as guide lines, then cut and mirrored (0.10.13; ant: poles 570 → 324, no open seam edges). The other cases still cut first.
 - With symmetry the result is mirrored: if the model is not symmetric the shape changes (a warning is shown).
 
+## Where the Hard Surface remesh still has defects (measured on 0.16.4)
+
+Measured on the Ver-03 test part (a disc with four holes, a revolution wall and chamfers / bevels, about 8.7K triangles in, Hard Surface, 20K quads, with and without symmetry X). A bad quad is one whose worst corner has a scaled Jacobian (sine of the corner) below 0.3.
+
+| Run | Faces | Triangles | Bad quads (below 0.3) |
+|---|---|---|---|
+| Symmetry X | 18,478 | 100 | about 140 (0.8 %) |
+| No symmetry | 20,726 | 0 | about 515 (2.5 %) |
+
+- The defects are small and local: they sit on the rings (hole rims, outer edge) at the places where the quad rows turn to follow the ring, and, with symmetry on, where a ring crosses the mirror line. The big surfaces are clean.
+- The count is the same at 8K and 20K quads, so it is a structural effect of the field (several close hard-edge lines: ring edge, both sides of a chamfer), not of the density.
+- About 24 of the 100 triangles lie on the mirror line (skinny pairs, corners of about 20 and 175 degrees that are not joined into a quad on purpose); the rest are isolated singularities.
+- Tried and **not** enough (changes were reverted): joining triangle pairs again after the mirror, letting the vertices on the mirror plane slide along it, and letting the vertices of a crease line slide along it during the bad-quad relaxation. They moved the count of bad quads from 140 to about 134, so the cure has to change the topology (the engine: the way the cross field aligns to close parallel hard lines), not the vertex positions.
+- At 80,000 quads with symmetry X the rims show the same effect over a larger area (84 s on this part).
+
 ## Known issues
 - **Intermittent seam gap with symmetry.** Once, on GitHub's continuous-integration runner, the matrix scenario "block-holes,
   symmetry X + hard edges" ended with 3 open edges on the centre seam (the add-on warned about it). It could not be
