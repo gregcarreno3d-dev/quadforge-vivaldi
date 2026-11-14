@@ -1,9 +1,9 @@
 # QuadForge
 
-A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust. Version **0.16.2**.
+A Blender add-on for fast quad and triangle remeshing, powered by **FORGE**, its own engine written in Rust. Version **0.16.3**.
 It handles organic sculpts and, in preview, CAD / STL parts (3D printing, mechanical): it can split a whole model into surfaces and keep chamfers, bevels and borders.
 
-![CAD parts with QuadForge 0.16.2. Top: surface analysis (planes grey, cylinders green, spheres purple, revolution teal, chamfers orange, bevels blue). Bottom: the Hard Surface remesh of the same parts at about 4K quads, with surface analysis on](docs/images/cad_0.16.jpg)
+![CAD parts with QuadForge 0.16.3. Top: surface analysis (planes grey, cylinders green, spheres purple, revolution teal, chamfers orange, bevels blue). Bottom: the Hard Surface remesh of the same parts at about 4K quads, with surface analysis on](docs/images/cad_0.16.jpg)
 
 ![Examples: an organic head at 20K quads, a hard-surface flange at 5K quads with creases kept, and the same flange without hard-edge detection](docs/images/examples.png)
 
@@ -11,7 +11,7 @@ It handles organic sculpts and, in preview, CAD / STL parts (3D printing, mechan
 
 Screenshots come from runs in Blender 5.2.3 on the author's machine; times depend on the computer.
 
-- Quads or triangles, from 2K to 500K faces, with a one-click **Hard Surface** / **Soft Surface (Organic)** setup
+- Quads or triangles, from 2K to 500K faces, with a one-click **Hard Surface** (flat shading, CAD surface analysis) / **Soft Surface (Organic)** (smooth shading) setup
 - Reads heavy sculpts directly, keeps hard edges, symmetry, UV maps, Face Sets and materials
 - Isolate zones by material, Face Set, mask or vertex group
 - Paintable density through a vertex group; smaller faces on thin parts and, optionally, on strongly curved details
@@ -38,8 +38,11 @@ Rust program (`engine-rs/`; it was C++17 until 0.14, see the changelog). In shor
 
 1. **Prepare (Python, in Blender).** The add-on reads the mesh and decides the constraints: hard edges found as
    *chains* of sharp edges (so noise is ignored and real creases are kept), zone borders, the symmetry plane, painted
-   density and flow guides. It writes everything to a small binary file and starts the engine as a separate process, so
-   a failure can never crash Blender and Esc simply stops it.
+   density and flow guides. With the **Hard Surface** button it also runs the **surface analysis** (next section): the
+   engine splits the CAD mesh into planes, cylinders, spheres, cones, chamfers and bevels, and the borders between them
+   (and the two sides of every chamfer or bevel wide enough for a row of quads) are added to the hard edges. Everything
+   is written to a small binary file and the engine starts as a separate process, so a failure can never crash
+   Blender and Esc simply stops it.
 2. **Repair and resample.** The engine makes the mesh manifold, closes open borders with temporary caps, and remeshes it
    into a uniform triangle mesh (isotropic remeshing, after Botsch and Kobbelt) with about six triangles per future quad
    cell. A size field makes the triangles smaller where the shape is thin or strongly curved.
@@ -50,13 +53,16 @@ Rust program (`engine-rs/`; it was C++17 until 0.14, see the changelog). In shor
 4. **Unfold into a square grid: integer-grid parametrization.** The surface is cut along a graph that ends at the
    singularities and mapped to the plane so that the field becomes the grid directions. The map is found by a sparse
    least-squares solve; the translations across cuts and the singular points are then rounded to integers gradually,
-   re-solving as it goes. The integer lines *u = k* and *v = k* are the quad edges.
+   re-solving as it goes. The integer lines *u = k* and *v = k* are the quad edges. If a strong size variation keeps
+   the solve from improving, the engine gives up early instead of retrying for many seconds.
 5. **Extract and refine.** Each vertex snaps to its nearest lattice node, vertices that land on the same node merge
    into a cell, and faces are traced around the cell graph. Every cell is split 2×2, relaxed on the surface, snapped to
    the marked creases, and the worst quads are repaired. The lattice spacing is corrected up to three times to land
    within a few percent of the requested count.
-6. **Finish (Python).** Sliver quads on thin bevels are collapsed, the symmetry cut is mirrored and welded, and UV maps,
-   Face Sets, mask and materials are carried over.
+6. **Finish (Python).** Sliver quads on thin bevels are collapsed, neighbouring leftover triangles are joined into quads
+   (Hard Surface), the symmetry cut is mirrored and welded, and UV maps, Face Sets, mask and materials are carried
+   over. Last comes the **shading**: **Hard Surface** leaves the result **Flat**, so no smoothing changes the look of
+   the surface; **Soft Surface / Organic** shades it **Smooth**. You can change it in Advanced.
 
 If the grid method fails for a shape (an unclosable border, a size gradient the surface cannot follow, the time limit),
 the engine falls back to a **triangle-pairing** method and tells you why. FORGE is a heuristic: it prefers to report a

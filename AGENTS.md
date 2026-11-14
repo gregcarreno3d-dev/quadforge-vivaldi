@@ -18,7 +18,8 @@ engine, the `.fmesh` format, the engine's decision flow, the invariants below in
    tools; keep the notice of any GPL code that is reused.
 7. Tests must pass before a change is proposed (commands in `docs/ARCHITECTURE_FOR_AI.md`, section 8). Do not weaken a
    test to make it pass; if a test is flaky, say why.
-8. Version numbers and releases are chosen by the maintainer: do not bump the version or tag a release in a normal change.
+8. Documentation must always match the add-on. When behaviour, settings, buttons, defaults or the pipeline change, update in the same change: the *How it works* section of `README.md` (and `docs/images/pipeline.svg` if the stages change), `quadforge/README.md`, `quadforge/READ_ME_FIRST.md`, `quadforge/docs/USER_GUIDE.md`, `quadforge/docs/STATUS_AND_LIMITS.md`, `docs/ARCHITECTURE_FOR_AI.md`, `llms.txt` and `quadforge/CHANGELOG.md`, and the version string everywhere (`grep -rn "<old version>"`).
+9. Version numbers and releases are chosen by the maintainer: do not bump the version or tag a release in a normal change.
 
 ## Quick commands
 

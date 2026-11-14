@@ -1,4 +1,4 @@
-# QuadForge — version 0.16.2
+# QuadForge — version 0.16.3
 
 > Entry document for any person or AI receiving this add-on. Read it first; details are in `docs/`.
 
@@ -6,7 +6,7 @@
 | Field | Value |
 |---|---|
 | Name | **QuadForge** (extension id: `quadforge`) |
-| Version | **0.16.2** |
+| Version | **0.16.3** |
 | Author | GregCarreno3D |
 | License | GPL-3.0-or-later |
 | Requires | Blender 4.2 or newer |

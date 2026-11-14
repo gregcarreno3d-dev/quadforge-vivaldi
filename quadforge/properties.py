@@ -300,9 +300,10 @@ class QuadForgeProperties(bpy.types.PropertyGroup):
         items=[
             ("AUTO", "Smooth with Sharp Edges", "Smooth surfaces, crisp corners (hard edges are marked sharp)"),
             ("SMOOTH", "Smooth", "Everything smooth"),
-            ("FLAT", "Flat", "Every face flat"),
+            ("FLAT", "Flat", "Every face flat (the Hard Surface button sets this, so nothing smooths the surface)"),
         ],
         default="AUTO",
+        update=_unmark_surface,
     )
     hide_original: BoolProperty(
         name="Hide Original",

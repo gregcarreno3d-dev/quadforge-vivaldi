@@ -28,7 +28,7 @@
   <text class="lab" x="30" y="28">A  BLENDER (Python)  preparation</text>
   <rect class="band" x="20" y="36" width="920" height="92" rx="10"/>
   <rect class="box py" x="34" y="50" width="160" height="64"/><text class="h" x="46" y="74">Read + zones</text><text class="s" x="46" y="92">modifiers applied,</text><text class="s" x="46" y="106">materials / sets / groups</text>
-  <rect class="box py" x="210" y="50" width="160" height="64"/><text class="h" x="222" y="74">Hard edges</text><text class="s" x="222" y="92">angle + chain filter,</text><text class="s" x="222" y="106">seams, zone borders</text>
+  <rect class="box py" x="210" y="50" width="160" height="64"/><text class="h" x="222" y="74">Hard edges + surfaces</text><text class="s" x="222" y="92">angle + chain filter, seams,</text><text class="s" x="222" y="106">CAD surface borders (opt.)</text>
   <rect class="box py" x="386" y="50" width="160" height="64"/><text class="h" x="398" y="74">Symmetry plan</text><text class="s" x="398" y="92">plane = guide line,</text><text class="s" x="398" y="106">cut after remesh</text>
   <rect class="box py" x="562" y="50" width="160" height="64"/><text class="h" x="574" y="74">Density + guides</text><text class="s" x="574" y="92">vertex group, flow</text><text class="s" x="574" y="106">guide edges</text>
   <rect class="box py" x="738" y="50" width="188" height="64"/><text class="h" x="750" y="74">Write .fmesh</text><text class="s" x="750" y="92">start the engine as a</text><text class="s" x="750" y="106">separate process</text>
@@ -36,7 +36,7 @@
 
   <path class="arr" d="M832 114V150"/>
 
-  <text class="lab" x="30" y="166">B  FORGE ENGINE (C++, separate process)</text>
+  <text class="lab" x="30" y="166">B  FORGE ENGINE (Rust, separate process)</text>
   <rect class="band" x="20" y="174" width="920" height="318" rx="10"/>
   <rect class="box cpp" x="34" y="190" width="200" height="64"/><text class="h" x="46" y="214">1  Repair</text><text class="s" x="46" y="232">manifold triangles,</text><text class="s" x="46" y="246">cap open borders</text>
   <rect class="box cpp" x="254" y="190" width="200" height="64"/><text class="h" x="266" y="214">2  Size field</text><text class="s" x="266" y="232">thickness, curvature,</text><text class="s" x="266" y="246">graded multiplier</text>
@@ -62,7 +62,7 @@
   <rect class="band" x="20" y="538" width="920" height="92" rx="10"/>
   <rect class="box py" x="34" y="552" width="200" height="64"/><text class="h" x="46" y="576">Sliver cleanup</text><text class="s" x="46" y="594">collapse tiny edges,</text><text class="s" x="46" y="608">retarget if faces vanish</text>
   <rect class="box py" x="254" y="552" width="200" height="64"/><text class="h" x="266" y="576">Cut + mirror + weld</text><text class="s" x="266" y="594">exact symmetry,</text><text class="s" x="266" y="608">no open seam</text>
-  <rect class="box py" x="474" y="552" width="200" height="64"/><text class="h" x="486" y="576">Transfer data</text><text class="s" x="486" y="594">UV maps, Face Sets,</text><text class="s" x="486" y="608">mask, materials</text>
+  <rect class="box py" x="474" y="552" width="200" height="64"/><text class="h" x="486" y="576">Transfer data + shading</text><text class="s" x="486" y="594">UV maps, Face Sets, mask,</text><text class="s" x="486" y="608">materials; Flat or Smooth</text>
   <rect class="box py" x="694" y="552" width="232" height="64"/><text class="h" x="706" y="576">Result object(s)</text><text class="s" x="706" y="594">one per requested level,</text><text class="s" x="706" y="608">original untouched</text>
   <path class="arr" d="M234 584H252"/><path class="arr" d="M454 584H472"/><path class="arr" d="M674 584H692"/>
 </svg>

@@ -1,6 +1,6 @@
 # QuadForge: architecture and behaviour, written for AI assistants
 
-Version described: **0.16.2** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector since 0.15.1; whole-model surface analysis since 0.16.0). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
+Version described: **0.16.3** (FORGE engine in Rust since 0.15.0; chamfer/bevel detector since 0.15.1; whole-model surface analysis since 0.16.0). Licence: GPL-3.0-or-later. Everything here was checked against the code in this
 repository. If this file and the code disagree, **the code wins**; please fix this file.
 
 This document is meant to be loaded whole into a model's context. It is dense and flat on purpose: sections are
@@ -286,7 +286,9 @@ Full description: `quadforge/docs/CHAMFER_BEVEL_DETECTOR.md`. Summary for code r
 | `shading` | AUTO / SMOOTH / FLAT |
 
 Surface profiles (`presets.SURFACE_PROFILES`): **Hard Surface** (hard edges from about 30°, right angles on, snapping
-on, Detail on Curves off) and **Organic**. Presets set target and angle and never touch symmetry or zones.
+on, Detail on Curves off, `use_surface_analysis` on, `shading` FLAT) and **Organic** (hard-edge detection off, Detail on Curves Medium,
+`shading` SMOOTH). Changing any of these values by hand unmarks the button (`_unmark_surface`). Presets set target and angle and never touch symmetry or zones.
+With `use_surface_analysis` and quad output, `pipeline._join_leftover_triangles` joins neighbouring triangle pairs after the relax step.
 
 ## 6. Invariants and rules for anyone changing the code
 

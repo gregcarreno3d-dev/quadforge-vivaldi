@@ -1,4 +1,4 @@
-# QuadForge 0.16.2
+# QuadForge 0.16.3
 
 A Blender add-on (4.2 or newer, developed on 5.2) that remeshes meshes into clean **quads or triangles**, powered by
 **FORGE**, its own dependency-free engine written in Rust. It reads heavy sculpts directly and also handles CAD / STL
@@ -10,8 +10,8 @@ parts, where it can analyse the whole model into surfaces and keep their real bo
 ## What it does
 
 - **Count target** (ZRemesher style): `4000` gives roughly 4000 quads. Quads or triangles, 2K to 500K faces.
-- **Two surface buttons**: **Hard Surface** (CAD, mechanical parts: hard edges from 30°, right angles, surface analysis on)
-  and **Soft Surface / Organic** (sculpts). They configure the add-on and stay marked.
+- **Two surface buttons**: **Hard Surface** (CAD, mechanical parts: hard edges from 30°, right angles, surface analysis on, result shaded **Flat**)
+  and **Soft Surface / Organic** (sculpts: result shaded **Smooth**). They configure the add-on and stay marked.
 - **Smart hard edges**: edge chains, noise smaller than two quads ignored, corners snapped onto the model's edge lines.
 - **Surface analysis (preview, 0.16)**: for CAD meshes it splits the whole model into planes, cylinders, spheres, cones,
   surfaces of revolution and free-form patches, finds chamfers (orange) and bevels (blue), and lists every border.

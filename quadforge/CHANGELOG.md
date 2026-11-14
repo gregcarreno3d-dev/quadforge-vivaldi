@@ -1,7 +1,11 @@
 # Changelog
 
-## 0.16.2
+## 0.16.3
+- **Shading follows the surface type:** the **Hard Surface** button now leaves the result **Flat** (no smoothing changes the surface) and **Soft Surface / Organic** leaves it **Smooth**. Changing Shading by hand unmarks the button, as with the other values it sets.
 - Surface analysis: thin slivers narrower than a band (a ring cut off a revolution wall) and small curved fragments that join a free-form surface smoothly (a fold line across a free-form top) are absorbed by the neighbouring surface; touching free-form patches merge. Found in 0.16.1 test screenshots (Ver-01 top, Ver-03 rim).
+- Documentation: the *How it works* section, the pipeline figure, the user guide and the status are brought up to the current behaviour (surface analysis in the preparation step, joining of leftover triangles, shading as the last step).
+
+## 0.16.2
 - **Name:** the add-on is now simply **QuadForge** (the series name "Vivaldi" is gone). The extension id stays `quadforge`, so upgrades keep working. Package names are `quadforge-<version>-<platform>.zip`; the repository moves to `gregcarreno3d-dev/quadforge` (GitHub redirects the old address).
 - Documentation brought up to date: new README for the add-on, entry document, user guide, status and limits, surface analysis, detector, architecture and `llms.txt`; new image of the surface analysis and the Hard Surface remesh on CAD parts (`docs/images/cad_0.16.jpg`).
 - Surface analysis: neighbouring spheres with the same centre and radius are merged (a sphere cap was split in two near the pole).

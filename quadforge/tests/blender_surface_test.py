@@ -19,7 +19,9 @@ check(s.surface_type == "NONE", "starts with no button marked")
 
 check(bpy.ops.quadforge.set_surface(surface="ORGANIC") == {"FINISHED"}, "organic button runs")
 check(s.surface_type == "ORGANIC" and not s.use_sharp_angle and s.curvature_detail == "MEDIUM", "organic: hard edges off, Detail on Curves Medium")
+check(s.shading == "SMOOTH", "organic: the result is shaded smooth")
 check(bpy.ops.quadforge.set_surface(surface="HARD") == {"FINISHED"}, "hard surface button runs")
+check(s.shading == "FLAT" and s.surface_type == "HARD", "hard surface: the result is shaded flat and the button stays marked")
 check(s.surface_type == "HARD" and s.use_sharp_angle and abs(math.degrees(s.sharp_angle) - 30.0) < 0.01
       and s.curvature_detail == "OFF" and s.keep_right_angles, "hard surface: edges from 30 degrees, Detail off")
 check(bpy.ops.quadforge.set_surface(surface="NOPE") == {"CANCELLED"}, "unknown surface is refused")
@@ -34,6 +36,9 @@ check(s.surface_type == "NONE", "changing a value by hand unmarks the button")
 bpy.ops.quadforge.set_surface(surface="HARD")
 s.sharp_angle = math.radians(40)
 check(s.surface_type == "NONE", "changing the angle by hand unmarks it too")
+bpy.ops.quadforge.set_surface(surface="HARD")
+s.shading = "AUTO"
+check(s.surface_type == "NONE", "changing the shading by hand unmarks the button")
 
 from quadforge.presets import TARGET_CHOICES, format_target
 check(TARGET_CHOICES[0] == 2000 and TARGET_CHOICES[-1] == 500000 and list(TARGET_CHOICES) == sorted(TARGET_CHOICES), "target list runs from 2K to 500K in order")

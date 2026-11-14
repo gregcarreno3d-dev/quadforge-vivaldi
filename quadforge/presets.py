@@ -89,16 +89,18 @@ SURFACE_PROFILES = {
     "HARD": SurfaceProfile(
         label="Hard Surface",
         description="Mechanical, architectural or armour shapes. Keeps corners and creases (hard edges from 30 degrees, "
-                    "right angles and edge snapping on) and uses even faces, without Detail on Curves.",
+                    "right angles and edge snapping on) and uses even faces, without Detail on Curves. The result is shaded Flat, "
+                    "so no smoothing changes the look of the surface.",
         values={"use_sharp_angle": True, "sharp_angle_degrees": 30.0, "smart_features": True,
-                "keep_right_angles": True, "curvature_detail": "OFF", "use_surface_analysis": True},
+                "keep_right_angles": True, "curvature_detail": "OFF", "use_surface_analysis": True, "shading": "FLAT"},
     ),
     "ORGANIC": SurfaceProfile(
         label="Soft Surface / Organic",
         description="Characters, creatures, faces and sculpts. Hard-edge detection off (your own sharp edges and seams "
-                    "are still kept) and Detail on Curves = Medium, for more faces on eyelids, lips and ear rims.",
+                    "are still kept) and Detail on Curves = Medium, for more faces on eyelids, lips and ear rims. The result is "
+                    "shaded Smooth.",
         values={"use_sharp_angle": False, "sharp_angle_degrees": 35.0, "smart_features": True,
-                "keep_right_angles": True, "curvature_detail": "MEDIUM", "use_surface_analysis": False},
+                "keep_right_angles": True, "curvature_detail": "MEDIUM", "use_surface_analysis": False, "shading": "SMOOTH"},
     ),
 }
 

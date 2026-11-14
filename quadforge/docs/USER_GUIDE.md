@@ -1,4 +1,4 @@
-# User guide — QuadForge 0.16.2
+# User guide — QuadForge 0.16.3
 
 ## 1. Basic flow (3 steps)
 1. Select the mesh (triangles or quads, any density). The add-on switches to Object Mode by itself.
@@ -29,7 +29,7 @@ Above about 6 million faces (FORGE) Blender asks for confirmation.
 - **Quick Preview:** makes a small copy (about 3,000 faces, usually a few seconds, about 6 s for a 248,000-face head) with your current settings so you can check the flow before the full run. It never touches your original and is deleted when you run the full Remesh.
 - **Subdivision Match (Advanced):** for quads that you will subdivide. A Subdivision Surface modifier shrinks a mesh; this option moves the vertices so the smooth result lands on your original surface (in a test the error after two levels fell about 40 times). Made for smooth, organic shapes: sharp creases stay where they are and no point moves more than a third of an edge.
 - **Last Result:** faces, quad %, poles, time, warnings. Poles are not shown for triangles.
-- **Advanced:** shading, clean mesh, hide original, copy UV maps, copy Face Sets and mask, .
+- **Advanced:** shading (the **Hard Surface** button sets it to Flat so nothing smooths the surface; **Soft Surface / Organic** sets it to Smooth), clean mesh, hide original, copy UV maps, copy Face Sets and mask, .
 
 ## 4. Recipes
 - **Character for animation:** FORGE, Quads, Character preset, X symmetry.
