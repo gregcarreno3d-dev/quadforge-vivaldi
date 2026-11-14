@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Surface analysis: a chamfer triangle that meets a plain surface almost tangentially (under 6°) goes back to that surface. Fixes the small orange rectangle that a seam of the STL left on the wall of Ver-03.
+
 ## 0.16.3
 - **Shading follows the surface type:** the **Hard Surface** button now leaves the result **Flat** (no smoothing changes the surface) and **Soft Surface / Organic** leaves it **Smooth**. Changing Shading by hand unmarks the button, as with the other values it sets.
 - Surface analysis: thin slivers narrower than a band (a ring cut off a revolution wall) and small curved fragments that join a free-form surface smoothly (a fold line across a free-form top) are absorbed by the neighbouring surface; touching free-form patches merge. Found in 0.16.1 test screenshots (Ver-01 top, Ver-03 rim).

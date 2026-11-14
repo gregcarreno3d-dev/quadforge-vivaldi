@@ -618,6 +618,35 @@ pub fn analyze(m: &PolyMesh, prm: &SurfParams) -> SurfaceReport {
     for f in 0..nf {
         tsurf[f] = if band_of[f] >= 0 { band_surf[&band_of[f]] } else if patch[f] >= 0 { surf_of_patch[patch[f] as usize] } else { -1 };
     }
+    // a chamfer is a flat strip with sharp edges to both sides: a chamfer triangle that meets a plain surface almost
+    // tangentially (under 6 degrees) is really a piece of that surface that the detector swept in (a seam of the STL),
+    // so it goes back to it (two passes: a short run of such triangles is peeled from the outside)
+    {
+        let cos_t = 6.0f64.to_radians().cos();
+        for _pass in 0..2 {
+            let mut moves: Vec<(usize, i32)> = Vec::new();
+            for f in 0..nf {
+                let s = tsurf[f];
+                if s < 0 || surfaces[s as usize].band < 0 || surfaces[s as usize].kind != "chamfer" { continue; }
+                let mut best: Option<(i32, f64)> = None;
+                for i in 0..3 {
+                    let g = t.adj[f][i];
+                    if g < 0 { continue; }
+                    let b = tsurf[g as usize];
+                    if b < 0 || surfaces[b as usize].band >= 0 { continue; }
+                    let c = t.nrm[f].dot(t.nrm[g as usize]);
+                    if c >= cos_t && best.map_or(true, |(_, bc)| c > bc) { best = Some((b, c)); }
+                }
+                if let Some((b, _)) = best { moves.push((f, b)); }
+            }
+            if moves.is_empty() { break; }
+            for (f, b) in moves { tsurf[f] = b; }
+        }
+        // the polygons that lost every triangle no longer belong to the band
+        let mut keep = vec![false; m.sizes.len()];
+        for f in 0..nf { let s = tsurf[f]; if s >= 0 && surfaces[s as usize].band >= 0 { keep[t.own[f] as usize] = true; } }
+        for q in 0..keep.len() { if !keep[q] { rep.bands.face_band[q] = -1; } }
+    }
     // tiny leftovers (slivers between surfaces, fragments of a fine cylinder) join the neighbour they touch the most
     {
         let total: f64 = t.area.iter().sum();
